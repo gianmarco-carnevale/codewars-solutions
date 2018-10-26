@@ -4,7 +4,7 @@ Written by Gianmarco Carnevale
 
 
 */
-#if 0
+#if 1
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -938,6 +938,37 @@ char* superConvertToString(superlong_t* num)
   return result;
 }
 
+void superPrintWithBase(superlong_t* num, int base)
+{
+  unsigned n,i,printLen,j,k;
+  char buffer[10];
+  char* result;
+  char c;
+  superlong_t* rem;
+  superlong_t* billion,*one;
+  superlong_t* division,*p;
+  if (base<2)
+    return;
+  if (base>255)
+    return;
+  p = getSuperlong(base);
+  for (;;)
+  {
+    division = superDivision(num,p,&rem);
+    superPrint(rem);
+    if (superIsZero(division))
+      break;
+    else
+    {
+      superDelete(division);
+      superDelete(rem);
+    }
+  }
+  printf("\n");
+  superDelete(p);
+}
+
+
 superlong_t* superConvertFromString(char* s)
 {
   unsigned n;
@@ -1018,48 +1049,32 @@ int searchLast(int n)
   return 1;
 }
 
-char *factorial(int n)
+superlong_t *factorial(int n)
 {
   char* result;
   superlong_t* p, *prod,*previous;
   int i;
-  _init();
+
   if (n<0)
     return NULL;
 
-  if ((n==0)||(n==1))
+  if (n<2)
   {
-    result = (char*)malloc(2*sizeof(char));
-    if (result)
-    {
-      result[0]='1';
-      result[1]=0;
-    }
-    return result;
+    return getSuperlong(1);
   }
 
-  i=searchLast(n);
-  if (i==n)
-    return superConvertToString(tbl[i]);
-
-  if (tbl[i])
-  {
-    previous=tbl[i];
-    i++;
-  }
-
-  for (;i<=n;i++)
+  previous = getSuperlong(1);
+  for (i=2;i<=n;i++)
   {
 
     prod = Multiply(previous,(uint32_t)i);
+
+    superDelete(previous);
     previous = prod;
-    if (i<=NFACT)
-      tbl[i]=prod;
   }
-
-  result = superConvertToString(prod);
-
-  return result;
+  superPrint(prod);
+  printf("\n");
+  return prod;
 }
 
 
@@ -1306,35 +1321,6 @@ char* decompose(int n)
 #endif
 
 #include <stdio.h>
-#include <stdarg.h>
-int myfunction(int n,...)
-{
-    int sum = 0;
-    int i;
-    int* p =&sum;
-    if (n<=0)
-      return 0;
-    for (i=0;i<n;i++)
-        sum+=p[11+2*i];
-    return sum;
-}
-
-
-void getOffsets(int a, int b, int c, int d, int e, int f)
-{
-  int *p[6];
-  int i;
-  p[0]=&a;
-  p[1]=&b;
-  p[2]=&c;
-  p[3]=&d;
-  p[4]=&e;
-  p[5]=&f;
-  for (i=1;i<6;i++)
-  {
-    printf("offset[%i]==%lld\n",i-1,(unsigned long long)(p[i]-p[i-1]));
-  }
-}
 
 
 
@@ -1342,13 +1328,11 @@ void getOffsets(int a, int b, int c, int d, int e, int f)
 
 int main(int argc, char* argv[])
 {
+  superlong_t* p = factorial(41);
+  /*superPrintWithBase(p,16);*/
+  superDelete(p);
 
-  int m = myfunction(6,71,72,73,74,75,76);
 
-
-  printf("%i\n",m);
-
-getOffsets(4,2,3,6,7,9);
 
   return 0;
 }
