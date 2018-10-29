@@ -21,46 +21,66 @@ static int getCumulativeSum(int n)
 }
 
 
-static int getRangeSum(int a, int b)
+static int getRawRangeSum(int a, int b)
 {
   int i,sum;
   if (b<a)
+  {
+    printf("ERROR: invalid range\n");
     return -1;
+  }
   for (i=a,sum=0;i<=b;i++)
   {
     sum+=getBitSum(i);
   }
   return sum;
 }
-/*
-   001    01
-   010    01
-   011    10
-   100    01
-   101    10
-   110    10
-   111    11
-  1000    01
-  1001    10
-  1010    10
-  1011    11
-  1100    10
-  1101    11
-  1110    11
-  1111   100
- 10000   001
 
-*/
+static int getRangeSum(int , int );
 
-int _getRangeSum(int a, int b)
+static int getEvenRangeSum(int a,int b)
 {
-  int delta, difference;
+  int difference,nibble,i,m,partial,ratio;
+  difference = b - a;
+  for (m=0xF,nibble=0x1;;m<<=4,nibble<<=4)
+  {
+    if (difference & m)
+    {
+      break;
+    }
+  }
+  ratio = difference/nibble;
+  printf("%x,%x,ratio==%i\n",a,b,ratio);
+  for (partial=0,i=0;i<ratio;i++,a+=nibble)
+  {
+    partial += getRangeSum(a, a+nibble);
+    if (i<ratio-1)
+      partial -= getBitSum(a+nibble);
+    printf("[%x,%x]\n",a, a+nibble);
+  }
+  return partial;
+}
+
+
+static int getRangeSum(int a, int b)
+{
+  int delta, difference,i,j,m,nibble,partial;
   if (b<a)
+  {
+    printf("ERROR: invalid range\n");
     return -1;
+  }
   delta = 1 + a + getBitSum(a);
   difference = b - a;
+/*
+  printf("difference==%i, delta==%i\n",difference,delta);
+*/
   switch (difference)
   {
+    case 0:
+      return getBitSum(a);
+    case 0x1:
+      return getBitSum(a) + getBitSum(b);
     case 0x10:
       return 0x20 + delta;
     case 0x100:
@@ -77,23 +97,27 @@ int _getRangeSum(int a, int b)
       return 0xe0000000 + delta;
 
     default:
-      return 0;
+    {
+      return -1;
+    }
     break;
   }
-  return 0;
+  return -1;
 }
 
 
 int main(int argc, char* argv[])
 {
   int a,b,c,s1, s2,s3;
-  a = 0x12;
+  a = 0x123;
   b = a + 0x20000;
 
-  s1 = getRangeSum(a,b);
-  s2 = _getRangeSum(a,b);
-
+  s1 = getRawRangeSum(a,b);
+  s2 = getRangeSum(a,b);
+  s3 = getEvenRangeSum(a,b);
+  printf("----------------\n");
   printf("%x\n",s1);
   printf("%x\n",s2);
+  printf("%x\n",s3);
   return 0;
 }
