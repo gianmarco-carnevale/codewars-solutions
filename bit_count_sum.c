@@ -63,9 +63,18 @@ static long long getRange256Sum(int a, int b)
     return -1;
   if (b<0x100)
     return range256Sum[b] - range256Sum[a] + bit_a;
-  result = range256Sum[0xff] - range256Sum[a] + bit_a;
-  result += getRawRangeSum(0xff,b) - 8; /* popcount64b(0xff) */
-  return result;
+  else
+  {
+    if (a<0x100)
+    {
+      result = range256Sum[0xff] - range256Sum[a] + bit_a;
+      result += getRawRangeSum(0xff,b) - 8; /* popcount64b(0xff) */
+      return result;
+    }
+    else
+      return getRawRangeSum(a,b);
+  }
+
 }
 
 
@@ -82,7 +91,24 @@ static long long getBitSum(int n)
 }
 
 
+/*
 
+getRangeSum (0,0x400) = getRangeSum(0,0xff) + getRangeSum(0x100,0x1ff) + getRangeSum(0x300,0x3ff) + bitcount(0x400)
+
+getRangeSum(0x100,0x1ff) = (0xff+1) * getRangeSum(0,0xff)
+getRangeSum(0x200,0x2ff) = 2*(0xff+1)*getRangeSum(0,0xff)
+getRangeSum(0x300,0x3ff) = 3*(0xff+1)*getRangeSum(0,0xff)
+
+-----------------------------------
+
+getRangeSum (0,0x1000) =
+
+
+
+
+
+
+*/
 
 
 
@@ -99,14 +125,8 @@ static long long getRecursiveRangeSum(int a, int b)
   difference = b - a;
   if (difference<0x100)
   {
-    if (b<0x100)
-    {
-
-    }
-    else
-    {
-return (long long)getRawRangeSum(a,b);
-    }
+    printf("getRange256Sum(%i,%i)\n",a,b);
+    return getRange256Sum(a,b);
   }
 
   else
@@ -129,8 +149,8 @@ int main(int argc, char* argv[])
   int a,b,c,s1, s2,s3,i,j,prev;
   a = 80;
   b = 300;
-  s1 = getRawRangeSum(a,b);
-  s2 = getRange256Sum(a,b);
+  s1 = getRecursiveRangeSum(1,1000000000);
+  s2 = getRange256Sum(1,1);
   printf("%d\n",s1);
   printf("%d\n",s2);
   return 0;
