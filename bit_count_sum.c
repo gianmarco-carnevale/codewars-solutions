@@ -2,27 +2,26 @@
 #include <stdlib.h>
 #include <ctype.h>
 
-const unsigned m1  = 0x55555555;
-const unsigned m2  = 0x33333333;
-const unsigned m4  = 0x0f0f0f0f;
-const unsigned m8  = 0x00ff00ff;
-const unsigned m16 = 0x0000ffff;
-const unsigned m32 = 0xffffffff;
 
-int popcount64b(unsigned x)
+
+
+static long long getBitSum(int n)
 {
-    x -= (x >> 1) & m1;
-    x = (x & m2) + ((x >> 2) & m2);
-    x = (x + (x >> 4)) & m4;
-    x += x >>  8;
-    x += x >> 16;
-    return x & 0x7f;
+  int i;
+  long long sum;
+  for(i=0,sum=0;i<32;i++)
+  {
+    sum += (n & (1<<i))?1:0;
+  }
+  return sum;
 }
 
 
-static long long getRawRangeSum(int a, int b)
+
+
+static long long getRawRangeSum(int a, long long b)
 {
-  int i;
+  long long i;
   long long sum;
   if (b<a)
   {
@@ -55,40 +54,8 @@ static const int range256Sum[0x100]=
 
 
 
-static long long getRange256Sum(int a, int b)
-{
-  long long result;
-  int bit_a = popcount64b(a);
-  if (b<a)
-    return -1;
-  if (b<0x100)
-    return range256Sum[b] - range256Sum[a] + bit_a;
-  else
-  {
-    if (a<0x100)
-    {
-      result = range256Sum[0xff] - range256Sum[a] + bit_a;
-      result += getRawRangeSum(0xff,b) - 8; /* popcount64b(0xff) */
-      return result;
-    }
-    else
-      return getRawRangeSum(a,b);
-  }
-
-}
 
 
-
-static long long getBitSum(int n)
-{
-  int i;
-  long long sum;
-  for(i=0,sum=0;i<32;i++)
-  {
-    sum += (n & (1<<i))?1:0;
-  }
-  return sum;
-}
 
 
 /*
@@ -101,57 +68,81 @@ getRangeSum(0x300,0x3ff) = 3*(0xff+1)*getRangeSum(0,0xff)
 
 -----------------------------------
 
-getRangeSum (0,0x1000) =
+getCumulativeSum(0xABCDEF78) =    getRangeSum(1,           0xA0000000) +
+                                  getRangeSum(0xA0000000+1,0xAB000000) +
+                                  getRangeSum(0xAB000000+1,0xABC00000) +
+                                  getRangeSum(0xABC00000+1,0xABCD0000) +
+                                  getRangeSum(0xABCD0000+1,0xABCDE000) +
+                                  getRangeSum(0xABCDE000+1,0xABCDEF00) +
+                                  getRangeSum(0xABCDEF00+1,0xABCDEF70) +
+                                  getRangeSum(0xABCDEF70+1,0xABCDEF78)
 
 
+getRangeSum(1, 0xA0000000) = getRangeSum(1,            0x10000000) +
+                             getRangeSum(0x10000000+1, 0x20000000) +
+                             getRangeSum(0x20000000+1, 0x30000000) +
+                             getRangeSum(0x30000000+1, 0x40000000) +
+                             getRangeSum(0x40000000+1, 0x50000000) + ...
+
+getRangeSum(1,0x10000000) = table
+getRangeSum(0x10000000+1,0x20000000) =
+
+getRangeSum(0x40000000+1, 0x50000000) = getBitCount(0x4) * (0x10000000-1) * getRangeSum(1,0x10000000-1) + getBitCount(0x50000000);
 
 
+getRangeSum(0xABCD0000+1,0xABCDE000) = getBitCount(0xABCD) * 0xE000 * getRangeSum(1,0xE000);
 
+
+getRangesum(0x100,0x10000) = getRangesum(0x100,0x1000) + getRangesum(0x1000+1,0x10000)
 
 */
 
+static long long rangeSumTable[32]={
+0x1,0x2,0x5,0xd,0x21,0x51,0xc1,0x1c1,0x401,0x901,0x1401,0x2c01,0x6001,
+0xd001,0x1c001,0x3c001,0x80001,0x110001,0x240001,0x4c0001,0xa00001,
+0x1500001,0x2c00001,0x5c00001,0xc000001,0x19000001,0x34000001,0x6c000001,
+0xe0000001,0x1d0000001,0x3c0000001,0x7c0000001};
 
 
-static long long getRecursiveRangeSum(int a, int b)
+
+
+static long long getCumulativeSum(int n)
 {
-  int middle,difference;
+  int i,count,left,mask;
   long long result;
-  if (b<a)
+  left=-1;
+  count=0;
+  for (result=0,i=31;i>=0;i--)
   {
-    printf("ERROR: invalid range\n");
-    return -1;
+    mask = (1<<i);
+    if (n & mask)
+    {
+      count++;
+      if ((n == mask)||(i==0))
+      {
+        return rangeSumTable[i];
+      }
+      else
+      {
+        n = n & ~(0xFFFFFFFF << i);
+        result = rangeSumTable[i]-1 + n + count + getCumulativeSum(n);
+        return result;
+      }
+    }
   }
-
-  difference = b - a;
-  if (difference<0x100)
-  {
-    printf("getRange256Sum(%i,%i)\n",a,b);
-    return getRange256Sum(a,b);
-  }
-
-  else
-  {
-    middle = ((long long)a + (long long)b)/2;
-    result = getRecursiveRangeSum(a,middle) + getRecursiveRangeSum(middle,b) - getBitSum(middle);
-  }
+  return result;
 }
-
-
-
-/*
-getBitSum (a | b)= getBitSum(a) + getBitSum(b) - getBitSum(a & b)
-
-*/
 
 
 int main(int argc, char* argv[])
 {
   int a,b,c,s1, s2,s3,i,j,prev;
-  a = 80;
-  b = 300;
-  s1 = getRecursiveRangeSum(1,1000000000);
-  s2 = getRange256Sum(1,1);
-  printf("%d\n",s1);
-  printf("%d\n",s2);
+  /*              98 7654 3210   */
+  a = 0x54346a3;/*  0010 1010 0110   */
+
+    printf("%lld\n",getRawRangeSum(0x0,a));
+    printf("%lld\n", getCumulativeSum(a));
+
+
   return 0;
 }
