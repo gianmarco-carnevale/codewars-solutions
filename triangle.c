@@ -78,6 +78,7 @@ static int mix(char a, char b)
     if (b=='G') return 'R';
     if (b=='R') return 'G';
   }
+  printf("unhandled characters %c and %c\n",a,b);
   return 0;
 }
 
@@ -179,7 +180,7 @@ char straightMix(const char *row)
   return res;
 }
 
-char triangle(const char *row)
+char _triangle(const char *row)
 {
   int length;
   length = strlen(row);
@@ -245,7 +246,7 @@ static void printfBase3(unsigned int n, char *dest, unsigned size)
   if (i<=size)
     memset(dest,colors[0],size-i);
   else
-      printf("ERROR:!!!!\n");
+    printf("ERROR:!!!!\n");
 }
 
 static void printOpenBrackets(unsigned index, unsigned int n, unsigned *powPtr)
@@ -290,16 +291,22 @@ static void printClosedBrackets(unsigned index, unsigned int n, unsigned *powPtr
   }
 }
 
-
+static char getInt(char c)
+{
+  if (c=='R') return 0;
+  if (c=='G') return 1;
+  if (c=='B') return 2;
+  return -1;
+}
 
 #define MAX_LENGTH 8
 static void printSequence(unsigned int n)
 {
   unsigned i,j;
-  unsigned res;
+  unsigned p;
   unsigned* power;
   int bracketCount;
-  char buf[MAX_LENGTH+1];
+  char* buf;
   if (n==0)
   {
     printf("ERROR: size cannot be zero\n");
@@ -310,36 +317,48 @@ static void printSequence(unsigned int n)
     printf("ERROR: size is too large\n");
     return;
   }
-  power = (unsigned*)malloc(n*sizeof(unsigned));
-  if (power==NULL)
+  buf = (char*)malloc(MAX_LENGTH*sizeof(char));
+  if (buf==NULL)
   {
     printf("ERROR: malloc failed\n");
     return;
   }
-  for (i=0,res=1;i<n;i++)
+  power = (unsigned*)malloc(n*sizeof(unsigned));
+  if (power==NULL)
   {
-    res = res*3;
-    power[i]=res;
-    printf("power[%i]==%i\n",i,res);
+    printf("ERROR: malloc failed\n");
+    free(buf);
+    return;
   }
+
+  for (i=0,p=1;i<n;i++)
+  {
+    p = p*3;
+    power[i]=p;
+  }
+  printf("static const int mixOrder=%d;\n",n);
   printf("static char mix%d",n);
   for (i=0;i<n;i++) printf("[3]");
   printf("=");
-  for (i=0;i<res;i++)
+  for (i=0;i<p;i++)
   {
     printOpenBrackets(i,n,power);
     printfBase3(i,buf,n);
     printf("'%c'",defaultMix(buf,n));
     printClosedBrackets(i,n,power);
   }
-
+  free(buf);
+  free(power);
+  printf("static char getMix(char* ptr)\n{\n");
+  printf("  return mix%d",n);
+  for (i=0;i<n;i++)
+  {
+    printf("[getInt(ptr[%i])]",i);
+  }
+  printf(";\n}\n");
 }
 
-
-
-
-
-
+static const int mixOrder=6;
 static char mix6[3][3][3][3][3][3]={{{{{{'R','B','G'},{'G','R','B'},{'B','G','R'}},{{'B','G','R'},{'R','B','G'},{'G','R','B'}},
                                   {{'G','R','B'},{'B','G','R'},{'R','B','G'}}},{{{'B','G','R'},{'R','B','G'},{'G','R','B'}},
                                   {{'G','R','B'},{'B','G','R'},{'R','B','G'}},{{'R','B','G'},{'G','R','B'},{'B','G','R'}}},
@@ -381,6 +400,74 @@ static char mix6[3][3][3][3][3][3]={{{{{{'R','B','G'},{'G','R','B'},{'B','G','R'
                                   {{'G','R','B'},{'B','G','R'},{'R','B','G'}},{{'R','B','G'},{'G','R','B'},{'B','G','R'}}},
                                   {{{'G','R','B'},{'B','G','R'},{'R','B','G'}},{{'R','B','G'},{'G','R','B'},{'B','G','R'}},
                                   {{'B','G','R'},{'R','B','G'},{'G','R','B'}}}}}};
+static char getMix(char* ptr)
+{
+  return mix6[getInt(ptr[0])][getInt(ptr[1])][getInt(ptr[2])][getInt(ptr[3])][getInt(ptr[4])][getInt(ptr[5])];
+}
+
+char triangle(const char* row)
+{
+  unsigned i;
+  unsigned n;
+  char* buf;
+  char r;
+  n = strlen(row);
+  if (n<1)
+    return 0;
+  if (n==1)
+    return row[0];
+  if (n==2)
+    return mix(row[0],row[1]);
+  buf = (char*)malloc((n-1)*sizeof(char));
+  if (buf==NULL)
+    return 0;
+  if (n>=mixOrder)
+  {
+    for (i=0;i<n-mixOrder+1;i++)
+    {
+      buf[i]=getMix(&row[i]);
+    }
+    n = n - mixOrder+1;
+    if (n==1)
+    {
+      r=buf[0];
+      free(buf);
+      return r;
+    }
+    for (;;)
+    {
+      if (n>=mixOrder)
+      {
+        for (i=0;i<n-mixOrder+1;i++)
+        {
+          buf[i]=getMix(&buf[i]);
+        }
+        n = n - mixOrder+1;
+        if (n==1)
+        {
+          r=buf[0];
+          free(buf);
+          return r;
+        }
+      }
+      else
+      {
+        r = defaultMix(buf,n);
+        free(buf);
+        return r;
+      }
+    }
+  }
+  else
+  {
+    free(buf);
+    r = defaultMix(row,n);
+    return r;
+  }
+}
+
+
+
 
 
 int main(int argc, char* argv[])
@@ -396,7 +483,7 @@ int main(int argc, char* argv[])
                       "RGBGGGBBGGRGBGRRRRGBBGRG",
                       "GGBGRGBBGRGRGRGBBGRGGBGBG"};
                       */
-                      #if 0
+#if 0
   const char* test[]={"RBGRB","RBGRBB","RBGRBBB","RBGRBBBB","RBGRBBBBB",
                       "RBGRBBBBBB","RBGRBBBBBBB","RBGRBBBBBBBB","RBGRBBBBBBBBB",
                       "RBGRBBBBBBBBBB","RBGRBBBBBBBBBBB","RBGRBBBBBBBBBBBB","RBGRBBBBBBBBBBBBB","RBGRBBBBBBBBBBBBBB"};
@@ -404,10 +491,23 @@ int main(int argc, char* argv[])
   for (i=0;i<n;i++)
   {
     length = strlen(test[i]);
-    printf("mix(%s)==%c, straight==%c\n",test[i],defaultMix(test[i],length),straightMix(test[i]));
+    printf("mix(%s)==%c, triangle==%c\n",test[i],defaultMix(test[i],length),triangle(test[i]));
   }
-  #endif
-  printSequence(6);
+#endif
+#if 0
+
+  char b[7];
+  b[mixOrder]=0;
+  for (i=0;i<100;i++)
+  {
+    printfBase3(i,b,mixOrder);
+    if (defaultMix(b,mixOrder)==getMix(b))
+      printf("ok\n");
+  }
+
+
+#endif
+  printSequence(7);
   return 0;
 
 }
