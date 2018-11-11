@@ -4,6 +4,7 @@ Written by Gianmarco Carnevale
 
 
 */
+#include <stdlib.h>
 #if 1
 #include <stdio.h>
 #include <stdlib.h>
@@ -899,7 +900,7 @@ char* superConvertToString(superlong_t* num)
       if (superIsZero(division))
         break;
 
-      printLen = sprintf(buffer,"%llu",rem->val);
+      printLen = sprintf(buffer,"%lu",rem->val);
       if (printLen>9)
         printf("ERROR: more characters than expected!\n");
       n = n - 9;
@@ -940,32 +941,39 @@ char* superConvertToString(superlong_t* num)
 
 void superPrintWithBase(superlong_t* num, int base)
 {
-  unsigned n,i,printLen,j,k;
-  char buffer[10];
-  char* result;
-  char c;
+  int zeroCount;
+  int nonzero;
   superlong_t* rem;
-  superlong_t* billion,*one;
   superlong_t* division,*p;
   if (base<2)
     return;
-  if (base>255)
+  if (base>256)
     return;
   p = getSuperlong(base);
-  for (;;)
+  for (zeroCount=0,nonzero=0;;)
   {
     division = superDivision(num,p,&rem);
-    superPrint(rem);
     if (superIsZero(division))
-      break;
+    {
+      superDelete(p);
+      superDelete(division);
+      printf("base %d, %i zeros\n",base,zeroCount);
+      return;
+    }
     else
     {
-      superDelete(division);
+      if (nonzero==0)
+      {
+        if (rem->val==0)
+          zeroCount++;
+        else
+          nonzero=1;
+      }
+      superDelete(num);
+      num = division;
       superDelete(rem);
     }
   }
-  printf("\n");
-  superDelete(p);
 }
 
 
@@ -1071,9 +1079,9 @@ superlong_t *factorial(int n)
 
     superDelete(previous);
     previous = prod;
-  }
+  }/*
   superPrint(prod);
-  printf("\n");
+  printf("\n");*/
   return prod;
 }
 
@@ -1243,7 +1251,7 @@ int printSolution(long long* p, int N)
   printf("\n");
   return res;
 }
-
+#if 0
 int searchSolution(struct squareSum* p)
 {
   int i;
@@ -1319,20 +1327,193 @@ char* decompose(int n)
   return output;
 }
 #endif
+void printZerosBase(int n,int base)
+{
+  superlong_t* p = factorial(n);
+  printf("%i!",n);
+  superPrintWithBase(p,base);
+}
+
+#endif
 
 #include <stdio.h>
 
 
 
 
+#define INTEGER_MAX 1000000
+#define NPRIMES 54
+static int primes[NPRIMES]={2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,
+                     101,103,107,109,113,127,131,137,139,149,151,157,163,167,173,179,181,191,193,197,199,
+                     211,223,227,229,233,239,241,251};
+
+ static int getPrimes(int n,int* pFactor,int* pExp)
+ {
+   int i,j;
+   if (n<2)
+     return 0;
+   if (n>INTEGER_MAX)
+     return 0;
+   for (i=0,j=0;n>1;i++)
+   {
+     if (n % primes[i] == 0)
+     {
+       pExp[j]=0;
+       for (;n/primes[i];)
+       {
+         if (n % primes[i] == 0)
+         {
+           n = n/primes[i];
+           pFactor[j]=primes[i];
+           pExp[j]++;
+         }
+         else
+         {
+           break;
+         }
+       }
+
+       j++;
+     }
+   }
+   return j;
+ }
+
+
+ int zeroes (int number,int base)
+ {
+   int power,sum,nf,i;
+   int factor[8];
+   int exponent[8];
+   int result = 0x7FFFFFFF;
+   if (base<2)
+     return 0;
+   if (base>256)
+     return 0;
+   if (number<2)
+     return 0;
+   if (number>INTEGER_MAX)
+     return 0;
+   nf = getPrimes(base,factor,exponent);
+   printf("nf==%i\n",nf);
+   for (i=0;i<nf;i++) printf("%i,",factor[i]);
+   printf("\n");
+   for (i=0;i<nf;i++) printf("%i,",exponent[i]);
+   printf("\n");
+   if (nf>0)
+   {
+     for (i=0;i<nf;i++)
+     {
+       for (sum=0,power=factor[i];number>=power;power*=factor[i])
+       {
+         sum+=number/power;
+       }
+       if (result>sum/exponent[i])
+         result = sum/exponent[i];
+     }
+     printf("result=%i\n",result);
+     return result;
+   }
+   return result;
+ }
+
+
+void eratosthenes(int n)
+{
+  int *res;
+  int i,k,count;
+  if (n<2)
+    return;
+  if (n>1000000)
+    return;
+  res = (int*)calloc(n+1,sizeof(int));
+  if (res)
+  {
+    res[0]=1;
+    res[1]=1;
+
+    for (i=2;i<=n;)
+    {
+      if (res[i]==0)
+      {
+        for (k=2;i*k <= n;k++)
+        {
+          res[i*k]=1;
+        }
+        i++;
+        for (;i<=n;)
+        {
+          if (res[i]==0)
+          {
+            break;
+          }
+          else
+            i++;
+        }
+      }
+    }
+    count = 0;
+    for (i=0;i<=n;i++)
+    {
+      if (res[i]==0)
+        count++;
+    }
+
+    printf("#define NPRIMES %i\nstatic int primes[NPRIMES]=",count);
+    for (i=0;i<=n;i++)
+    {
+      if (res[i]==0)
+      {
+        if (i==2)
+          printf("{%i",i);
+        else
+          printf(",%i",i);
+      }
+      if (i%40==0)
+        printf("\n");
+    }
+    printf("};\n");
+    free(res);
+  }
+}
+
+
+
+char a[4][7] = {"Common", "Point", "Boost", "Better"};
+char* b[4] = {a+3, a+1, a, a+2};
+
+char** c(void)
+{
+    return &b;
+}
+
+char* d(void)
+{
+    return c()[1] - 3;
+}
+
+char buf[256];
+typedef char* (*Ftype1)(void);
+typedef char* (*Ftype2)(Ftype1);
+
+#if 1
+
+char *pointer_monster(Ftype1 f)
+{
+    int len;
+
+    len  = sprintf(buf, "%s", f()[3]);
+    len += sprintf(buf + len, "%s ", *((**f)()-1)[0]+/* ? */);
+    len += sprintf(buf + len, "%s", (*f())[/* ? */]-4);
+    len += sprintf(buf + len, "%s", f()[/* ? */][2]+3);
+    len += sprintf(buf + len, "%s", *((**f)()-1)[0]+/* ? */);
+    return buf;
+}
+#endif
+
 
 int main(int argc, char* argv[])
 {
-  superlong_t* p = factorial(41);
-  /*superPrintWithBase(p,16);*/
-  superDelete(p);
-
-
-
+  pointer_monster(d);
   return 0;
 }

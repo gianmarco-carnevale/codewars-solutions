@@ -236,7 +236,7 @@ char _triangle(const char *row)
 static void printfBase3(unsigned int n, char *dest, unsigned size)
 {
   int i;
-  static const char colors[3]={'R','G','B'};
+  static const char colors[3]={'B','G','R'};
   for (i=0;n>0;i++)
   {
     dest[0]=colors[n%3];
@@ -359,47 +359,7 @@ static void printSequence(unsigned int n)
 }
 
 static const int mixOrder=6;
-static char mix6[3][3][3][3][3][3]={{{{{{'R','B','G'},{'G','R','B'},{'B','G','R'}},{{'B','G','R'},{'R','B','G'},{'G','R','B'}},
-                                  {{'G','R','B'},{'B','G','R'},{'R','B','G'}}},{{{'B','G','R'},{'R','B','G'},{'G','R','B'}},
-                                  {{'G','R','B'},{'B','G','R'},{'R','B','G'}},{{'R','B','G'},{'G','R','B'},{'B','G','R'}}},
-                                  {{{'G','R','B'},{'B','G','R'},{'R','B','G'}},{{'R','B','G'},{'G','R','B'},{'B','G','R'}},
-                                  {{'B','G','R'},{'R','B','G'},{'G','R','B'}}}},{{{{'G','R','B'},{'B','G','R'},{'R','B','G'}},
-                                  {{'R','B','G'},{'G','R','B'},{'B','G','R'}},{{'B','G','R'},{'R','B','G'},{'G','R','B'}}},
-                                  {{{'R','B','G'},{'G','R','B'},{'B','G','R'}},{{'B','G','R'},{'R','B','G'},{'G','R','B'}},
-                                  {{'G','R','B'},{'B','G','R'},{'R','B','G'}}},{{{'B','G','R'},{'R','B','G'},{'G','R','B'}},
-                                  {{'G','R','B'},{'B','G','R'},{'R','B','G'}},{{'R','B','G'},{'G','R','B'},{'B','G','R'}}}},
-                                  {{{{'B','G','R'},{'R','B','G'},{'G','R','B'}},{{'G','R','B'},{'B','G','R'},{'R','B','G'}},
-                                  {{'R','B','G'},{'G','R','B'},{'B','G','R'}}},{{{'G','R','B'},{'B','G','R'},{'R','B','G'}},
-                                  {{'R','B','G'},{'G','R','B'},{'B','G','R'}},{{'B','G','R'},{'R','B','G'},{'G','R','B'}}},
-                                  {{{'R','B','G'},{'G','R','B'},{'B','G','R'}},{{'B','G','R'},{'R','B','G'},{'G','R','B'}},
-                                  {{'G','R','B'},{'B','G','R'},{'R','B','G'}}}}},{{{{{'B','G','R'},{'R','B','G'},{'G','R','B'}},
-                                  {{'G','R','B'},{'B','G','R'},{'R','B','G'}},{{'R','B','G'},{'G','R','B'},{'B','G','R'}}},
-                                  {{{'G','R','B'},{'B','G','R'},{'R','B','G'}},{{'R','B','G'},{'G','R','B'},{'B','G','R'}},
-                                  {{'B','G','R'},{'R','B','G'},{'G','R','B'}}},{{{'R','B','G'},{'G','R','B'},{'B','G','R'}},
-                                  {{'B','G','R'},{'R','B','G'},{'G','R','B'}},{{'G','R','B'},{'B','G','R'},{'R','B','G'}}}},
-                                  {{{{'R','B','G'},{'G','R','B'},{'B','G','R'}},{{'B','G','R'},{'R','B','G'},{'G','R','B'}},
-                                  {{'G','R','B'},{'B','G','R'},{'R','B','G'}}},{{{'B','G','R'},{'R','B','G'},{'G','R','B'}},
-                                  {{'G','R','B'},{'B','G','R'},{'R','B','G'}},{{'R','B','G'},{'G','R','B'},{'B','G','R'}}},
-                                  {{{'G','R','B'},{'B','G','R'},{'R','B','G'}},{{'R','B','G'},{'G','R','B'},{'B','G','R'}},
-                                  {{'B','G','R'},{'R','B','G'},{'G','R','B'}}}},{{{{'G','R','B'},{'B','G','R'},{'R','B','G'}},
-                                  {{'R','B','G'},{'G','R','B'},{'B','G','R'}},{{'B','G','R'},{'R','B','G'},{'G','R','B'}}},
-                                  {{{'R','B','G'},{'G','R','B'},{'B','G','R'}},{{'B','G','R'},{'R','B','G'},{'G','R','B'}},
-                                  {{'G','R','B'},{'B','G','R'},{'R','B','G'}}},{{{'B','G','R'},{'R','B','G'},{'G','R','B'}},
-                                  {{'G','R','B'},{'B','G','R'},{'R','B','G'}},{{'R','B','G'},{'G','R','B'},{'B','G','R'}}}}},
-                                  {{{{{'G','R','B'},{'B','G','R'},{'R','B','G'}},{{'R','B','G'},{'G','R','B'},{'B','G','R'}},
-                                  {{'B','G','R'},{'R','B','G'},{'G','R','B'}}},{{{'R','B','G'},{'G','R','B'},{'B','G','R'}},
-                                  {{'B','G','R'},{'R','B','G'},{'G','R','B'}},{{'G','R','B'},{'B','G','R'},{'R','B','G'}}},
-                                  {{{'B','G','R'},{'R','B','G'},{'G','R','B'}},{{'G','R','B'},{'B','G','R'},{'R','B','G'}},
-                                  {{'R','B','G'},{'G','R','B'},{'B','G','R'}}}},{{{{'B','G','R'},{'R','B','G'},{'G','R','B'}},
-                                  {{'G','R','B'},{'B','G','R'},{'R','B','G'}},{{'R','B','G'},{'G','R','B'},{'B','G','R'}}},
-                                  {{{'G','R','B'},{'B','G','R'},{'R','B','G'}},{{'R','B','G'},{'G','R','B'},{'B','G','R'}},
-                                  {{'B','G','R'},{'R','B','G'},{'G','R','B'}}},{{{'R','B','G'},{'G','R','B'},{'B','G','R'}},
-                                  {{'B','G','R'},{'R','B','G'},{'G','R','B'}},{{'G','R','B'},{'B','G','R'},{'R','B','G'}}}},
-                                  {{{{'R','B','G'},{'G','R','B'},{'B','G','R'}},{{'B','G','R'},{'R','B','G'},{'G','R','B'}},
-                                  {{'G','R','B'},{'B','G','R'},{'R','B','G'}}},{{{'B','G','R'},{'R','B','G'},{'G','R','B'}},
-                                  {{'G','R','B'},{'B','G','R'},{'R','B','G'}},{{'R','B','G'},{'G','R','B'},{'B','G','R'}}},
-                                  {{{'G','R','B'},{'B','G','R'},{'R','B','G'}},{{'R','B','G'},{'G','R','B'},{'B','G','R'}},
-                                  {{'B','G','R'},{'R','B','G'},{'G','R','B'}}}}}};
+static char mix6[3][3][3][3][3][3];
 static char getMix(char* ptr)
 {
   return mix6[getInt(ptr[0])][getInt(ptr[1])][getInt(ptr[2])][getInt(ptr[3])][getInt(ptr[4])][getInt(ptr[5])];
@@ -466,34 +426,291 @@ char triangle(const char* row)
   }
 }
 
+static int areReversed(char* p1, char* p2, int length)
+{
+  int i;
+  for (i=0;i<length/2;i++)
+  {
+    if (p1[i]!=p2[length-1-i])
+      return 0;
+  }
+  return 1;
+}
 
+static char rotation(char c, int rule)
+{
+  static char rotationRule[6][3]={{'B','G','R'},{'B','R','G'},{'G','B','R'},
+                                  {'G','R','B'},{'R','B','G'},{'R','G','B'}};
+  switch (c)
+  {
+    case 'B':return rotationRule[rule][0];
+    case 'G':return rotationRule[rule][1];
+    case 'R':return rotationRule[rule][2];
+    default: return 0;
+  }
+  return 0;
+}
 
+int equivalent(char* p1, char* p2, int length)
+{
+  int i,j,count,upper;
+  for (i=0;i<6;i++)
+  {
+    for (j=0,count=0;j<length;j++)
+    {
+      if (p1[j]==rotation(p2[j],i))
+        count++;
+      else
+        break;
+    }
 
+    if (count==length)
+      return 1;
+
+    for (j=0,count=0;j<length;j++)
+    {
+      if (p1[length-j-1]==rotation(p2[j],i))
+        count++;
+    }
+    if (count==length)
+      return 1;
+
+  }
+  return 0;
+}
+#define MAX_STRING_LENGTH 20
+struct sequence_t
+{
+  char row[MAX_STRING_LENGTH+1];
+  struct sequence_t* next;
+};
+
+void deleteList(struct sequence_t* p)
+{
+  struct sequence_t* temp;
+  for (;p;)
+  {
+    temp = p->next;
+    free(p);
+    p = temp;
+  }
+}
+
+struct sequence_t *addSequence(struct sequence_t * p, char* str, int length)
+{
+  struct sequence_t * temp;
+  if (p==NULL)
+  {
+    p=(struct sequence_t*)malloc(sizeof(struct sequence_t));
+    if (p==NULL)
+      return NULL;
+    p->next=NULL;
+    memcpy(p->row,str,length);
+    p->row[length]=0;
+    return p;
+  }
+  for (temp=p;;)
+  {
+    if (temp->next==NULL)
+      break;
+    else
+      temp = temp->next;
+  }
+  temp->next = (struct sequence_t*)malloc(sizeof(struct sequence_t));
+  if (temp->next)
+  {
+    temp->next->next = NULL;
+    memcpy(temp->next->row,str,length);
+    temp->next->row[length]=0;
+  }
+  return p;
+}
+
+int alreadyAdded(struct sequence_t * p, char *str, int length)
+{
+  if (p==NULL)
+    return 0;
+  for (;p;p=p->next)
+  {
+    if (equivalent(p->row,str,length))
+      return 1;
+  }
+  return 0;
+}
+
+void generate(int N)
+{
+  int i;
+  long power;
+  int count;
+  char m,l,r,q1,q2,q3,q4;
+  char buf[MAX_STRING_LENGTH+1];
+  struct sequence_t *seqList = NULL;
+  if (N<2)
+    return;
+  if (N>MAX_STRING_LENGTH)
+    return;
+  for (i=0,power=1;i<N;i++)
+  {
+    power = power*3;
+  }
+  buf[N]=0;
+  for (i=0,count=0;i<power;i++)
+  {
+    printfBase3(i,buf,N);
+
+    if (!alreadyAdded(seqList,buf,N))
+    {
+      seqList = addSequence(seqList,buf,N);
+      m = defaultMix(buf,N);
+      q1 = defaultMix(buf,N/4);
+      q2 = defaultMix(&buf[N/4],N/4);
+      q3 = defaultMix(&buf[N/2],N/4);
+      q4 = defaultMix(&buf[(N*3)/4],N/4);
+      if (m!=mix(mix(q1,q2),mix(q3,q4)))
+        printf("wrong\n");
+
+      count++;
+    }
+  }
+  deleteList(seqList);
+  printf("A total of %i sequences\n",count);
+}
+
+static char mixPowerOf3(char* ptr, unsigned length)
+{
+  char temp[3];
+  printf("mixPowerOf3(%s,%d)\n",ptr,length);
+  if (length==3) return defaultMix(ptr,length);
+  length = length/3;
+  temp[0] = mixPowerOf3(ptr,length);
+  temp[1] = mixPowerOf3(&ptr[length],length);
+  temp[2] = mixPowerOf3(&ptr[2*length],length);
+  return defaultMix(temp,3);
+}
+
+static char mixPowerOf3PlusOne(char* ptr, unsigned length)
+{
+  printf("mixPowerOf3PlusOne(%s,%d)\n",ptr,length);
+  return mix(ptr[0],ptr[length-1]);
+}
+
+static char mixDoublePowerOf3(char* ptr, unsigned length)
+{
+  printf("mixDoublePowerOf3(%s,%d)\n",ptr,length);
+  return mix(mixPowerOf3(ptr,length/2),mixPowerOf3(&ptr[length/2],length/2));
+}
+
+static const unsigned long pow3[20] = {1,3,9,27,81,243,729,2187,6561,19683,
+                                       59049,177147,531441,1594323,4782969,
+                                       14348907,43046721,129140163,387420489,
+                                       1162261467};
+
+enum eLength_type
+{
+  ePowerOf3,
+  ePowerOf3PlusOne,
+  eDoublePowerOf3,
+  eGeneric,
+  eInvalid
+};
+
+static enum eLength_type getLengthType(unsigned long length)
+{
+  int i;
+  for (i=0;i<20;i++)
+  {
+    if (length<pow3[i])
+      break;
+  }
+  if (i==20)
+    return eInvalid;
+  if (i==0)
+    return eInvalid;
+  if (length==pow3[i-1])
+    return ePowerOf3;
+  if (length == pow3[i-1]+1)
+    ePowerOf3PlusOne;
+  if (length==2*pow3[i-1])
+    return eDoublePowerOf3;
+  return eGeneric;
+}
+
+static char lengthBasedMix(char* ptr, unsigned length)
+{
+  unsigned i;
+  char *temp;
+  char result;
+  enum eLength_type t = getLengthType(length);
+  printf("length type == %i\n",t);
+  switch (t)
+  {
+    case ePowerOf3:return mixPowerOf3(ptr,length);
+    case ePowerOf3PlusOne:return mixPowerOf3PlusOne(ptr,length);
+    case eDoublePowerOf3:return mixDoublePowerOf3(ptr,length);
+    case eGeneric:
+      if (length<4)
+        return defaultMix(ptr,length);
+      length--;
+      temp = (char*)malloc(length*sizeof(char));
+      if (temp==NULL)
+      {
+        printf("ERROR: malloc\n");
+        return 0;
+      }
+      for (i=0;i<length;i++)
+      {
+        temp[i]=mix(ptr[i],ptr[i+1]);
+      }
+      result = lengthBasedMix(temp,length);
+      free(temp);
+      return result;
+    break;
+    case eInvalid:
+      printf("ERROR: sequence too large\n");
+      return 0;
+    default:return 0;
+  }
+  return 0;
+}
+
+char myTriangle(const char* row)
+{
+  unsigned n;
+  if (row==NULL)
+    return 0;
+  n = strlen(row);
+  if (n<1)
+    return 0;
+  if (n==1)
+    return row[0];
+  if (n==2)
+    return mix(row[0],row[1]);
+  return lengthBasedMix((char*)row,n);
+}
 
 int main(int argc, char* argv[])
 {
   int i,length;
   int n;
-  /*
+
   const char* test[]={"RBRGBRBGGRRRBGBBBGG",
                       "RRBGRGBGBRRGRRBGGBRG",
                       "BBRRGBBGGGRBRGRGBGRGB",
                       "RRGRGBBGRGBRRGBGBRGGBG",
                       "GGRRGBBGRGBBGRRGRGGBRBR",
                       "RGBGGGBBGGRGBGRRRRGBBGRG",
-                      "GGBGRGBBGRGRGRGBBGRGGBGBG"};
-                      */
-#if 0
-  const char* test[]={"RBGRB","RBGRBB","RBGRBBB","RBGRBBBB","RBGRBBBBB",
-                      "RBGRBBBBBB","RBGRBBBBBBB","RBGRBBBBBBBB","RBGRBBBBBBBBB",
-                      "RBGRBBBBBBBBBB","RBGRBBBBBBBBBBB","RBGRBBBBBBBBBBBB","RBGRBBBBBBBBBBBBB","RBGRBBBBBBBBBBBBBB"};
+                      "GGBGRGBBGRGRGRGBBGRGGBGBG",
+                      "GRRGBGRBBGRGGBGGRGBGRGBGBRGBR"};
+
+
   n = sizeof(test)/sizeof(char*);
   for (i=0;i<n;i++)
   {
     length = strlen(test[i]);
-    printf("mix(%s)==%c, triangle==%c\n",test[i],defaultMix(test[i],length),triangle(test[i]));
+    printf("mix(%s)==%c, triangle==%c\n",test[i],defaultMix(test[i],length),myTriangle(test[i]));
   }
-#endif
+
 #if 0
 
   char b[7];
@@ -507,7 +724,7 @@ int main(int argc, char* argv[])
 
 
 #endif
-  printSequence(7);
-  return 0;
+
+
 
 }
