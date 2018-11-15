@@ -82,10 +82,12 @@ static int mix(char a, char b)
   return 0;
 }
 
-char defaultMix(const char *ptr, int length)
+char defaultMix( char *ptr, int length)
 {
   int i,j,n;
   char *temp,result;
+  if (length==1)
+    return ptr[0];
   n = length-1;
   temp = (char*)malloc(n*sizeof(char));
   if (temp)
@@ -93,20 +95,26 @@ char defaultMix(const char *ptr, int length)
     for (i=0;i<n;i++)
     {
       temp[i]=mix(ptr[i],ptr[i+1]);
+      printf("%c",temp[i]);
     }
+    printf("\n");
     for (i=n-1;i>0;i--)
     {
       for (j=0;j<i;j++)
       {
         temp[j]=mix(temp[j],temp[j+1]);
+        printf("%c",temp[j]);
       }
+      printf("\n");
+
     }
+
     result = temp[0];
     free(temp);
   }
   return result;
 }
-
+/*
 char recursiveMix(const char *ptr, int length)
 {
   if ((length%2==0) && (length/2>2))
@@ -116,9 +124,9 @@ char recursiveMix(const char *ptr, int length)
     return mix(recursiveMix(ptr,length),recursiveMix(&ptr[length],length));
   }
   else
-    return defaultMix(ptr,length);
+    return defaultMix((const char*)ptr,length);
 }
-
+*/
 char layerMix(const char *row)
 {
   int i,n;
@@ -179,7 +187,7 @@ char straightMix(const char *row)
   }
   return res;
 }
-
+/*
 char _triangle(const char *row)
 {
   int length;
@@ -192,51 +200,21 @@ char _triangle(const char *row)
     return mix(row[0],row[1]);
   return recursiveMix(row,length);
 }
+*/
 
-#if 0
-
- 0 0 0 0    0 1 2 0
-  0 0 0      2 0 1
-   0 0        1 2
-    0          0
-
-0 0 1 2 0
- 0 2 0 1
-  1 1 2
-   1 0
-    2
-
-
-1 2 0 0 0 0 0
- 0 1 0 0 0 0
-  2 2 0 0 0
-   2 1 0 0
-    0 2 0
-     1 1
-      1
-
-1 2      0 0
- 0
-
-
-
- 0 1 0
-  2 2
-   2
-
-{{'R','G','B'},{'R','G','B'},{'R','G','B'},{'R','G','B'},{'R','G','B'},{'R','G','B'}}
-
-
-
-
-
-#endif
 
 
 static void printfBase3(unsigned int n, char *dest, unsigned size)
 {
-  int i;
+  unsigned i,p;
   static const char colors[3]={'R','G','B'};
+  for (i=0,p=1;i<size;i++){p = p*3;}
+  if (n>=p)
+  {
+    printf("ERROR: number exceeds the available characters\n");
+    return;
+  }
+
   for (i=0;n>0;i++)
   {
     dest[0]=colors[n%3];
@@ -244,9 +222,12 @@ static void printfBase3(unsigned int n, char *dest, unsigned size)
     n=n/3;
   }
   if (i<=size)
+  {
     memset(dest,colors[0],size-i);
+  }
   else
-    printf("ERROR:!!!!\n");
+    printf("ERROR: size==%i, i==%i\n",size,i);
+
 }
 
 static void printOpenBrackets(unsigned index, unsigned int n, unsigned *powPtr)
@@ -286,7 +267,8 @@ static void printClosedBrackets(unsigned index, unsigned int n, unsigned *powPtr
       }
     }
     printf(",");
-    if (((index+1)>=18) && ((index+1)%18==0))
+#define NEW_LINE_COUNT 27
+    if (((index+1)>=NEW_LINE_COUNT) && ((index+1)%NEW_LINE_COUNT==0))
       printf("\n                                  ");
   }
 }
@@ -299,7 +281,7 @@ static char getInt(char c)
   return -1;
 }
 
-#define MAX_LENGTH 8
+#define MAX_LENGTH 13
 static void printSequence(unsigned int n)
 {
   unsigned i,j;
@@ -358,6 +340,47 @@ static void printSequence(unsigned int n)
   printf(";\n}\n");
 }
 
+/*
+feedforward ANC for QCC512x earbud application
+*/
+
+#if 0
+static char getInt(char c)
+{
+  if (c=='R') return 0;
+  if (c=='G') return 1;
+  if (c=='B') return 2;
+  return -1;
+}
+
+Fractal?
+
+
+  {                  'R',                                       'G',                                        'B'                  }
+
+               {'R','B','G'},                              {'G','R','B'},                              {'B','G','R'}   Type1
+
+
+{{'R','G','B'},{'B','R','G'},{'G','B','R'}},{{'G','B','R'},{'R','G','B'},{'B','R','G'}},{{'B','R','G'},{'G','B','R'},{'R','G','B'}} Type1
+
+{{{{'R','B','G'},{'R','B','G'},{'R','B','G'}},{{'R','B','G'},{'R','B','G'},{'R','B','G'}},{{'R','B','G'},{'R','B','G'},{'R','B','G'}}}, Type2
+ {{{'B','G','R'},{'B','G','R'},{'B','G','R'}},{{'B','G','R'},{'B','G','R'},{'B','G','R'}},{{'B','G','R'},{'B','G','R'},{'B','G','R'}}},
+ {{{'G','R','B'},{'G','R','B'},{'G','R','B'}},{{'G','R','B'},{'G','R','B'},{'G','R','B'}},{{'G','R','B'},{'G','R','B'},{'G','R','B'}}}};
+
+ {{{{{'R','G','B'},{'G','B','R'},{'B','R','G'}},{{'R','G','B'},{'G','B','R'},{'B','R','G'}},{{'R','G','B'},{'G','B','R'},{'B','R','G'}}},
+   {{{'G','B','R'},{'B','R','G'},{'R','G','B'}},{{'G','B','R'},{'B','R','G'},{'R','G','B'}},{{'G','B','R'},{'B','R','G'},{'R','G','B'}}},
+   {{{'B','R','G'},{'R','G','B'},{'G','B','R'}},{{'B','R','G'},{'R','G','B'},{'G','B','R'}},{{'B','R','G'},{'R','G','B'},{'G','B','R'}}}},
+  {{{{'G','B','R'},{'B','R','G'},{'R','G','B'}},{{'G','B','R'},{'B','R','G'},{'R','G','B'}},{{'G','B','R'},{'B','R','G'},{'R','G','B'}}},
+   {{{'B','R','G'},{'R','G','B'},{'G','B','R'}},{{'B','R','G'},{'R','G','B'},{'G','B','R'}},{{'B','R','G'},{'R','G','B'},{'G','B','R'}}},
+   {{{'R','G','B'},{'G','B','R'},{'B','R','G'}},{{'R','G','B'},{'G','B','R'},{'B','R','G'}},{{'R','G','B'},{'G','B','R'},{'B','R','G'}}}},
+  {{{{'B','R','G'},{'R','G','B'},{'G','B','R'}},{{'B','R','G'},{'R','G','B'},{'G','B','R'}},{{'B','R','G'},{'R','G','B'},{'G','B','R'}}},
+   {{{'R','G','B'},{'G','B','R'},{'B','R','G'}},{{'R','G','B'},{'G','B','R'},{'B','R','G'}},{{'R','G','B'},{'G','B','R'},{'B','R','G'}}},
+   {{{'G','B','R'},{'B','R','G'},{'R','G','B'}},{{'G','B','R'},{'B','R','G'},{'R','G','B'}},{{'G','B','R'},{'B','R','G'},{'R','G','B'}}}}};
+
+
+#endif
+
+
 static const int mixOrder=6;
 static char mix6[3][3][3][3][3][3]={{{{{{'R','B','G'},{'G','R','B'},{'B','G','R'}},{{'B','G','R'},{'R','B','G'},{'G','R','B'}},
                                   {{'G','R','B'},{'B','G','R'},{'R','B','G'}}},{{{'B','G','R'},{'R','B','G'},{'G','R','B'}},
@@ -404,7 +427,7 @@ static char getMix(char* ptr)
 {
   return mix6[getInt(ptr[0])][getInt(ptr[1])][getInt(ptr[2])][getInt(ptr[3])][getInt(ptr[4])][getInt(ptr[5])];
 }
-
+#if 0
 char triangle(const char* row)
 {
   unsigned i;
@@ -425,7 +448,7 @@ char triangle(const char* row)
   {
     for (i=0;i<n-mixOrder+1;i++)
     {
-      buf[i]=getMix(&row[i]);
+      buf[i]=getMix((char*)(&row[i]));
     }
     n = n - mixOrder+1;
     if (n==1)
@@ -465,9 +488,28 @@ char triangle(const char* row)
     return r;
   }
 }
+#endif
 
+int reverseAndMix(char* ptr,int length)
+{
+  int i;
+  int m = length/2;
+  for (i=0;i<m;i++)
+  {
+    ptr[i]=mix(ptr[i],ptr[length-1-i]);
+  }
+  if (length%2)
+  {
+    ptr[m+1]=0;
+    return m+1;
+  }
+  else
+  {
+    ptr[m]=0;
+    return m;
+  }
 
-
+}
 
 
 int main(int argc, char* argv[])
@@ -491,23 +533,64 @@ int main(int argc, char* argv[])
   for (i=0;i<n;i++)
   {
     length = strlen(test[i]);
-    printf("mix(%s)==%c, triangle==%c\n",test[i],defaultMix(test[i],length),triangle(test[i]));
+    printf("mix(%s)==%c\n",test[i],defaultMix(test[i],length));
   }
+#endif
+static const int N=110;
+char res;
+char test[]="RRGRBBGR";
+printf("mix(%s)==%c\n",test,defaultMix(test,strlen(test)));
+/*
+length = strlen(test);
+for (;length>1;)
+{
+  res=defaultMix(test,length);
+  printf("mix(%s)==%c\n",test,res);
+  length = reverseAndMix(test,length);
+}
+*/
+
+
+
+
+#if 0
+  char d,g;
+  char b[7];
+  int errCount;
+  b[mixOrder]=0;
+  for (i=0,errCount=0;i<729;i++)
+  {
+    printfBase3(i,b,mixOrder);
+    d = defaultMix(b,mixOrder);
+    g = getMix(b);
+    if (d!=g)
+    {
+      errCount++;
+      printf("ERROR: getMix(%s) returned %c instead of %c\n",b,g,d);
+    }
+  }
+  if (errCount)
+    printf("ERROR: validation failed\n");
+  else
+    printf("validation successful\n");
+
+
+
 #endif
 #if 0
 
-  char b[7];
-  b[mixOrder]=0;
-  for (i=0;i<100;i++)
-  {
-    printfBase3(i,b,mixOrder);
-    if (defaultMix(b,mixOrder)==getMix(b))
-      printf("ok\n");
-  }
+
+
+
+
+
+
+
+
+
 
 
 #endif
-  printSequence(7);
   return 0;
 
 }
