@@ -11,7 +11,7 @@ typedef unsigned long long twiceLinearInt_t;
 
 static int compare(const void* p1, const void* p2)
 {
-  int a,b;
+  twiceLinearInt_t a,b;
   a = *((twiceLinearInt_t*)p1);
   b = *((twiceLinearInt_t*)p2);
   if (a==b)
@@ -51,7 +51,8 @@ static twiceLinearInt_t* mergeRows(twiceLinearInt_t* first, int len1, twiceLinea
 
 static twiceLinearInt_t* buildTable(twiceLinearInt_t** pTable, int index)
 {
-  int i,count,length;
+  int i,length;
+  size_t count;
   twiceLinearInt_t *result, *row;
   struct sortedEntry_t* temp;
   if (index<0)
@@ -82,7 +83,6 @@ static twiceLinearInt_t* buildTable(twiceLinearInt_t** pTable, int index)
       result[count++]=(twiceLinearInt_t)2*row[i]+(twiceLinearInt_t)1;
       result[count++]=(twiceLinearInt_t)3*row[i]+(twiceLinearInt_t)1;
     }
-
     qsort((void*)result,count,sizeof(twiceLinearInt_t),compare);
   }
   else
@@ -90,19 +90,18 @@ static twiceLinearInt_t* buildTable(twiceLinearInt_t** pTable, int index)
     printf("ERROR: second malloc failed in buildTable\n");
     return NULL;
   }
-  printf("row[0]==%llu, row[%i]==%llu\n",row[0],length/2-1,row[length/2-1]);
-  /*
-  printf("From %llu to %llu\n",result[0],result[count-1]);
-  */
   pTable[index]=result;
   return result;
 }
 
 static twiceLinearInt_t* table[MAX_LEVELS];
+static twiceLinearInt_t* twiceLinearArray;
 
 static void clearAll()
 {
   int i;
+  if (twiceLinearArray)
+    free(twiceLinearArray);
   for (i=0;i<MAX_LEVELS;i++)
   {
     if (table[i])
@@ -115,17 +114,27 @@ static void clearAll()
 
 static void _init()
 {
-  int i;
-  int val=1;
+  int i,len1,len2;
+  twiceLinearInt_t* temp;
   static int firstTime=1;
   if (firstTime)
   {
     firstTime=0;
+    twiceLinearArray=NULL;
     for (i=0;i<MAX_LEVELS;i++)
     {
       table[i]=NULL;
     }
     buildTable(table,20);
+    for (temp=table[0],len1=1,i=1;table[i];i++)
+    {
+      len2=(1<<i);
+      twiceLinearArray = mergeRows(temp,len1,table[i],len2);
+      if (i>1)
+        free(temp);
+      temp = twiceLinearArray;
+      len1 = len1+len2;
+    }
     atexit(clearAll);
   }
 }
@@ -149,28 +158,17 @@ void printTable(twiceLinearInt_t** pTable)
 
 twiceLinearInt_t dblLinear(int n)
 {
-  int row,i,len1,len2,offset;
-  twiceLinearInt_t* result,*temp,last;
+  int row,i,offset;
+  twiceLinearInt_t* temp,last;
   twiceLinearInt_t retVal;
   static int f=1;
   int repeatedLength = 0;
   _init();
-
-  for (temp=table[0],len1=1,i=1;table[i];i++)
-  {
-    len2=(1<<i);
-
-    result = mergeRows(temp,len1,table[i],len2);
-    if (i>1)
-      free(temp);
-    temp = result;
-    len1 = len1+len2;
-  }
   for (i=0;;)
   {
     for (offset=0;i<=n;i++)
     {
-      if ((i>0) & (result[i]==result[i-1]))
+      if ((i>0) & (twiceLinearArray[i]==twiceLinearArray[i-1]))
       {
         offset++;
       }
@@ -180,16 +178,8 @@ twiceLinearInt_t dblLinear(int n)
     else
       break;
   }
-
-  retVal = result[n+offset];
-  free(result);
-  return retVal;
+  return twiceLinearArray[n+offset];
 }
-
-
-
-
-
 
 
 int main(int argc, char* argv[])
