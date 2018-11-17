@@ -82,10 +82,12 @@ static int mix(char a, char b)
   return 0;
 }
 
-char defaultMix(const char *ptr, int length)
+char defaultMix( char *ptr, int length)
 {
   int i,j,n;
   char *temp,result;
+  if (length==1)
+    return ptr[0];
   n = length-1;
   temp = (char*)malloc(n*sizeof(char));
   if (temp)
@@ -93,20 +95,26 @@ char defaultMix(const char *ptr, int length)
     for (i=0;i<n;i++)
     {
       temp[i]=mix(ptr[i],ptr[i+1]);
+      printf("%c",temp[i]);
     }
+    printf("\n");
     for (i=n-1;i>0;i--)
     {
       for (j=0;j<i;j++)
       {
         temp[j]=mix(temp[j],temp[j+1]);
+        printf("%c",temp[j]);
       }
+      printf("\n");
+
     }
+
     result = temp[0];
     free(temp);
   }
   return result;
 }
-
+/*
 char recursiveMix(const char *ptr, int length)
 {
   if ((length%2==0) && (length/2>2))
@@ -116,9 +124,9 @@ char recursiveMix(const char *ptr, int length)
     return mix(recursiveMix(ptr,length),recursiveMix(&ptr[length],length));
   }
   else
-    return defaultMix(ptr,length);
+    return defaultMix((const char*)ptr,length);
 }
-
+*/
 char layerMix(const char *row)
 {
   int i,n;
@@ -179,7 +187,7 @@ char straightMix(const char *row)
   }
   return res;
 }
-
+/*
 char _triangle(const char *row)
 {
   int length;
@@ -192,104 +200,8 @@ char _triangle(const char *row)
     return mix(row[0],row[1]);
   return recursiveMix(row,length);
 }
+*/
 
-#if 0
-
- 0 0 0 0    0 1 2 0
-  0 0 0      2 0 1
-   0 0        1 2
-    0          0
-
-0 0 1 2 0
- 0 2 0 1
-  1 1 2
-   1 0
-    2
-
-
-1 2 0 0 0 0 0
- 0 1 0 0 0 0
-  2 2 0 0 0
-   2 1 0 0
-    0 2 0
-     1 1
-      1
-
-1 2      0 0
- 0
-
-
-
- 0 1 0
-  2 2
-   2
-
-{{'R','G','B'},{'R','G','B'},{'R','G','B'},{'R','G','B'},{'R','G','B'},{'R','G','B'}}
-
-
-
-
-
-#endif
-
-
-static void printfBase3(unsigned int n, char *dest, unsigned size)
-{
-  int i;
-  static const char colors[3]={'B','G','R'};
-  for (i=0;n>0;i++)
-  {
-    dest[0]=colors[n%3];
-    dest=&dest[1];
-    n=n/3;
-  }
-  if (i<=size)
-    memset(dest,colors[0],size-i);
-  else
-    printf("ERROR:!!!!\n");
-}
-
-static void printOpenBrackets(unsigned index, unsigned int n, unsigned *powPtr)
-{
-  unsigned i;
-  if (index==0)
-  {
-    for (i=0;i<n;i++) printf("{");
-  }
-  else
-  {
-    for (i=0;i<n;i++)
-    {
-      if ((index % powPtr[i] == 0) && (index>=powPtr[i]))
-      {
-        printf("{");
-      }
-    }
-  }
-}
-
-static void printClosedBrackets(unsigned index, unsigned int n, unsigned *powPtr)
-{
-  unsigned i;
-  if (index==powPtr[n-1]-1)
-  {
-    for (i=0;i<n;i++) printf("}");
-    printf(";\n");
-  }
-  else
-  {
-    for (i=0;i<n;i++)
-    {
-      if (((index+1) % powPtr[i] == 0) && ((index+1)/powPtr[i]))
-      {
-        printf("}");
-      }
-    }
-    printf(",");
-    if (((index+1)>=18) && ((index+1)%18==0))
-      printf("\n                                  ");
-  }
-}
 
 static char getInt(char c)
 {
@@ -299,7 +211,7 @@ static char getInt(char c)
   return -1;
 }
 
-#define MAX_LENGTH 8
+#define MAX_LENGTH 13
 static void printSequence(unsigned int n)
 {
   unsigned i,j;
@@ -358,184 +270,27 @@ static void printSequence(unsigned int n)
   printf(";\n}\n");
 }
 
-static const int mixOrder=6;
-static char mix6[3][3][3][3][3][3];
-static char getMix(char* ptr)
-{
-  return mix6[getInt(ptr[0])][getInt(ptr[1])][getInt(ptr[2])][getInt(ptr[3])][getInt(ptr[4])][getInt(ptr[5])];
-}
 
-char triangle(const char* row)
+
+int reverseAndMix(char* ptr,int length)
 {
-  unsigned i;
-  unsigned n;
-  char* buf;
-  char r;
-  n = strlen(row);
-  if (n<1)
-    return 0;
-  if (n==1)
-    return row[0];
-  if (n==2)
-    return mix(row[0],row[1]);
-  buf = (char*)malloc((n-1)*sizeof(char));
-  if (buf==NULL)
-    return 0;
-  if (n>=mixOrder)
+  int i;
+  int m = length/2;
+  for (i=0;i<m;i++)
   {
-    for (i=0;i<n-mixOrder+1;i++)
-    {
-      buf[i]=getMix(&row[i]);
-    }
-    n = n - mixOrder+1;
-    if (n==1)
-    {
-      r=buf[0];
-      free(buf);
-      return r;
-    }
-    for (;;)
-    {
-      if (n>=mixOrder)
-      {
-        for (i=0;i<n-mixOrder+1;i++)
-        {
-          buf[i]=getMix(&buf[i]);
-        }
-        n = n - mixOrder+1;
-        if (n==1)
-        {
-          r=buf[0];
-          free(buf);
-          return r;
-        }
-      }
-      else
-      {
-        r = defaultMix(buf,n);
-        free(buf);
-        return r;
-      }
-    }
+    ptr[i]=mix(ptr[i],ptr[length-1-i]);
+  }
+  if (length%2)
+  {
+    ptr[m+1]=0;
+    return m+1;
   }
   else
   {
-    free(buf);
-    r = defaultMix(row,n);
-    return r;
+    ptr[m]=0;
+    return m;
   }
-}
 
-static int areReversed(char* p1, char* p2, int length)
-{
-  int i;
-  for (i=0;i<length/2;i++)
-  {
-    if (p1[i]!=p2[length-1-i])
-      return 0;
-  }
-  return 1;
-}
-
-static char rotation(char c, int rule)
-{
-  static char rotationRule[6][3]={{'B','G','R'},{'B','R','G'},{'G','B','R'},
-                                  {'G','R','B'},{'R','B','G'},{'R','G','B'}};
-  switch (c)
-  {
-    case 'B':return rotationRule[rule][0];
-    case 'G':return rotationRule[rule][1];
-    case 'R':return rotationRule[rule][2];
-    default: return 0;
-  }
-  return 0;
-}
-
-int equivalent(char* p1, char* p2, int length)
-{
-  int i,j,count,upper;
-  for (i=0;i<6;i++)
-  {
-    for (j=0,count=0;j<length;j++)
-    {
-      if (p1[j]==rotation(p2[j],i))
-        count++;
-      else
-        break;
-    }
-
-    if (count==length)
-      return 1;
-
-    for (j=0,count=0;j<length;j++)
-    {
-      if (p1[length-j-1]==rotation(p2[j],i))
-        count++;
-    }
-    if (count==length)
-      return 1;
-
-  }
-  return 0;
-}
-#define MAX_STRING_LENGTH 20
-struct sequence_t
-{
-  char row[MAX_STRING_LENGTH+1];
-  struct sequence_t* next;
-};
-
-void deleteList(struct sequence_t* p)
-{
-  struct sequence_t* temp;
-  for (;p;)
-  {
-    temp = p->next;
-    free(p);
-    p = temp;
-  }
-}
-
-struct sequence_t *addSequence(struct sequence_t * p, char* str, int length)
-{
-  struct sequence_t * temp;
-  if (p==NULL)
-  {
-    p=(struct sequence_t*)malloc(sizeof(struct sequence_t));
-    if (p==NULL)
-      return NULL;
-    p->next=NULL;
-    memcpy(p->row,str,length);
-    p->row[length]=0;
-    return p;
-  }
-  for (temp=p;;)
-  {
-    if (temp->next==NULL)
-      break;
-    else
-      temp = temp->next;
-  }
-  temp->next = (struct sequence_t*)malloc(sizeof(struct sequence_t));
-  if (temp->next)
-  {
-    temp->next->next = NULL;
-    memcpy(temp->next->row,str,length);
-    temp->next->row[length]=0;
-  }
-  return p;
-}
-
-int alreadyAdded(struct sequence_t * p, char *str, int length)
-{
-  if (p==NULL)
-    return 0;
-  for (;p;p=p->next)
-  {
-    if (equivalent(p->row,str,length))
-      return 1;
-  }
-  return 0;
 }
 static char mixFourPowerOf3(char* , unsigned );
 void generate(int N)
@@ -586,26 +341,9 @@ static char mixPowerOf3(char* ptr, unsigned length)
 
 static char mixPowerOf3PlusOne(char* ptr, unsigned length)
 {
-
   return mix(ptr[0],ptr[length-1]);
 }
 
-static char mixDoublePowerOf3(char* ptr, unsigned length)
-{
-
-  return mix(mixPowerOf3(ptr,length/2),mixPowerOf3(&ptr[length/2],length/2));
-}
-
-static char mixFourPowerOf3(char* ptr, unsigned length)
-{
-  char temp[4];
-  length=length/4;
-  temp[0]=mixPowerOf3(ptr,length);
-  temp[1]=mixPowerOf3(&ptr[length],length);
-  temp[2]=mixPowerOf3(&ptr[2*length],length);
-  temp[3]=mixPowerOf3(&ptr[3*length],length);
-  return defaultMix(temp,4);
-}
 
 
 #define MAX_POW3_NUM  20
@@ -749,19 +487,7 @@ int main(int argc, char* argv[])
     printf("mix()==%c, triangle==%c\n",/*defaultMix(test[i],length)*/'@',myTriangle(test[i]));
   }
 
-#if 0
 
-  char b[7];
-  b[mixOrder]=0;
-  for (i=0;i<100;i++)
-  {
-    printfBase3(i,b,mixOrder);
-    if (defaultMix(b,mixOrder)==getMix(b))
-      printf("ok\n");
-  }
-
-
-#endif
 
 
 
