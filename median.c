@@ -2,11 +2,22 @@
 
 
 
+
+static int reduceToHalf(int size)
+{
+  if (size>1)
+  {
+    return (size%2)?1+size/2:size/2;
+  }
+  else
+    return 0;
+}
+
 static int findPosition(int *pNum, int size, int val)
 {
   int i;
   int upper = size-1;
-  size=(size%2)?1+size/2:size/2;
+  size=reduceToHalf(size);
   for (i=size;;)
   {
 /*
@@ -20,7 +31,7 @@ static int findPosition(int *pNum, int size, int val)
       }
       else
       {
-        size=(size%2)?1+size/2:size/2;
+        size=reduceToHalf(size);
         i = i + size;
         if (i>upper)
           i=upper;
@@ -34,7 +45,7 @@ static int findPosition(int *pNum, int size, int val)
       }
       else
       {
-        size=(size%2)?1+size/2:size/2;
+        size=reduceToHalf(size);
         i = i - size;
         if (i<0)
           i=0;
@@ -45,92 +56,95 @@ static int findPosition(int *pNum, int size, int val)
 }
 
 
+static int findTargetPosition(int* nums1, int nums1Size, int* nums2, int nums2Size, int targetPosition)
+{
+  int i,pos,upper;;
+  upper = nums2Size-1;
+  nums2Size=reduceToHalf(nums2Size);
+  for (i=nums2Size;nums2Size>0;)
+  {
+    pos = i + findPosition(nums1,nums1Size,nums2[i]);
+    if (pos==targetPosition)
+    {
+      printf("find(1, ... %i) + %i == %i\n",nums2[i],i,pos);
+      return pos;
+    }
 
+    nums2Size=reduceToHalf(nums2Size);
+    if (nums2Size==0)
+      return -1;
 
-
+    if (pos>targetPosition)
+    {
+      i = i - nums2Size;
+      if (i<0)
+        i=0;
+    }
+    else
+    {
+      i = i + nums2Size;
+      if (i>upper)
+        i=upper;
+    }
+  }
+  return -1;
+}
 
 double findMedianSortedArrays(int* nums1, int nums1Size, int* nums2, int nums2Size)
 {
-    int totalLength,medianPosition1, medianPosition2;
-    int pos1,pos2;
-    int targetPosition;
-    int first,second;
-    totalLength = nums1Size + nums2Size;
-    if (totalLength%2)
+  int totalLength,medianPosition1,medianPosition2;
+  int targetPosition,first,second;
+  totalLength = nums1Size + nums2Size;
+  if (totalLength%2)
+  {
+      medianPosition1 = totalLength/2;
+      medianPosition2 = medianPosition1;
+  }
+  else
+  {
+      medianPosition2 = totalLength/2;
+      medianPosition1 = medianPosition2-1;
+  }
+  targetPosition = findTargetPosition(nums1,nums1Size,nums2,nums2Size,medianPosition1);
+  if (targetPosition<0)
+  {
+    targetPosition = findTargetPosition(nums2,nums2Size,nums1,nums1Size,medianPosition1);
+    if (targetPosition<0)
     {
-        medianPosition1 = totalLength/2;
-        medianPosition2 = medianPosition1;
-    }
-    else
-    {
-        medianPosition2 = totalLength/2;
-        medianPosition1 = medianPosition2-1;
-    }
-    pos1 = nums1Size/2;
-    pos2 = nums2Size/2;
-    for (;;)
-    {
-      targetPosition = pos2 + findPosition(nums1,nums1Size,nums2[pos2]);
-      printf("target2==%i==%i+find()\n",targetPosition,pos2);
-      if (targetPosition==medianPosition1)
-      {
-        printf("target2 is good\n");
-        pos1=-1;
-        break;
-      }
-      pos1 += (targetPosition<medianPosition1)?1:-1;
-
-      targetPosition = pos1 + findPosition(nums2,nums2Size,nums1[pos1]);
-      printf("target2==%i==%i+find()\n",targetPosition,pos1);
-      if (targetPosition==medianPosition1)
-      {
-        printf("target1 is good\n");
-        pos2=-1;
-        break;
-      }
-      pos2 += (targetPosition<medianPosition1)?1:-1;
-    }
-    if ((pos1<0)&&(pos2<0))
       return -1.0;
-    if (pos1<0)
-      first = nums2[pos2];
-    else
-      first = nums1[pos1];
-      printf("first==%i\n",first);
-    if (medianPosition1==medianPosition2)
-      return (double)first;
-    printf("medianPosition2 required\n");
-    for (;;)
-    {
-      targetPosition = pos2 + findPosition(nums1,nums1Size,nums2[pos2]);
-      printf("target2'==%i==%i+find()\n",targetPosition,pos2);
-      if (targetPosition==medianPosition2)
-      {
-        printf("target2' is good\n");
-        pos1=-1;
-        break;
-      }
-      pos1 += (targetPosition<medianPosition2)?1:-1;
-
-      targetPosition = pos1 + findPosition(nums2,nums2Size,nums1[pos1]);
-      printf("target1'==%i==%i+find()\n",targetPosition,pos1);
-      if (targetPosition==medianPosition2)
-      {
-        printf("target1' is good\n");
-        pos2=-1;
-        break;
-      }
-      pos2 += (targetPosition<medianPosition2)?1:-1;
     }
-    if ((pos1<0)&&(pos2<0))
-      return -1.0;
-    if (pos1<0)
-      second = nums2[pos2];
     else
-      second = nums1[pos1];
-    printf("second==%i\n",second);
+    {
+      first = nums2[targetPosition];
+    }
+  }
+  else
+  {
+    first = nums2[targetPosition];
+  }
+  if (medianPosition1==medianPosition2)
+    return (double)first;
+  else
+  {
+    targetPosition = findTargetPosition(nums1,nums1Size,nums2,nums2Size,medianPosition2);
+    if (targetPosition<0)
+    {
+      targetPosition = findTargetPosition(nums2,nums2Size,nums1,nums1Size,medianPosition2);
+      if (targetPosition<0)
+      {
+        return -1.0;
+      }
+      else
+      {
+        second = nums2[targetPosition];
+      }
+    }
+    else
+    {
+      second = nums2[targetPosition];
+    }
     return (double)(first+second)/2.0;
-
+  }
 }
 
 
