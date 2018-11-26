@@ -3,7 +3,7 @@
 #include <string.h>
 #include <stdint.h>
 /*
-cd /cygdrive/c/Users/gcarneva/Documents/Personal/C-test/Codewars/superlong
+
  gcc twice-linear.c -o twice-linear.out && ./twice-linear.out
 */
 #define MAX_LEVELS 40
