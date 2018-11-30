@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#if 0
 
 #if 0
 
@@ -28,10 +29,6 @@ typedef struct
 {
   int sides[3];
 } Triangle;
-
-
-
-
 
 struct Line
 {
@@ -87,26 +84,49 @@ static Point getIntersection(struct Line l1, struct Line l2)
   return result;
 }
 
-double _triangleArea(Point a, Point b, Point c)
+static double getSquareDistance(Point a, Point b)
 {
-  Point d;
-  double result;
-  d.x = a.x - b.x;
-  d.y = a.y - b.y;
-  a.x = b.x - c.x;
-  a.y = b.y - c.y;
-  result = (d.x*a.y - d.y*a.x)/2.0;
-  return (result<0.0)?(-result):result;
+  double p,q;
+  p = a.x - b.x;
+  q = a.y - b.y;
+  return (p*p+q*q);
 }
 
-static double triangleArea(Point* pArray, int a, int b, int c)
+static Point getCircumcenter(Point a, Point b, Point c, double *pRadius)
+{
+  struct Line l1,l2,l3;
+  Point int1,int2,int3;
+  l1 = getLine(a,b);
+  l2 = getLine(b,c);
+  l3 = getLine(a,c);
+  int1 = getIntersection(l1,l2);
+  int2 = getIntersection(l2,l3);
+  int3 = getIntersection(l1,l3);
+  if (isinf(int1))
+  {
+    printf("WARNING: circumcenter");
+    *pRadius=INFINITY;
+    return int1;
+  }
+  if ((int1==int2)&&(int2==int3))
+  {
+    *pRadius = getSquareDistance(int1,a);
+    return int1;
+  }
+  printf("WARNING: unprecise circumcenter calculation\n");
+  *pRadius = getSquareDistance(int1,a);
+  return int1;
+}
+
+
+static double triangleArea2(Point* pArray, int a, int b, int c)
 {
   Point p,q;
   double result;
-  p.x = pArray[a]->x - pArray[b]->x;
-  p.y = pArray[a]->y - pArray[b]->y;
-  q.x = pArray[b]->x - pArray[c]->x;
-  q.y = pArray[b]->y - pArray[c]->y;
+  p.x = pArray[a].x - pArray[b].x;
+  p.y = pArray[a].y - pArray[b].y;
+  q.x = pArray[b].x - pArray[c].x;
+  q.y = pArray[b].y - pArray[c].y;
   result = (p.x*q.y - p.y*q.x)/2.0;
   return (result<0.0)?(-result):result;
 }
@@ -114,14 +134,21 @@ static double triangleArea(Point* pArray, int a, int b, int c)
 static int isInside(Point* pArray, Triangle* pT, int pointIndex)
 {
   double area,sum;
-  area = triangleArea(pArray,pT->sides[0],pT->sides[1],pT->sides[2]);
-  sum  = triangleArea(pT->sides[0],pT->sides[1],pointIndex);
-  sum += triangleArea(pT->sides[1],pT->sides[2],pointIndex);
-  sum += triangleArea(pT->sides[0],pT->sides[2],pointIndex);
+  if (pointIndex==pT->sides[0])
+    return 0;
+  if (pointIndex==pT->sides[1])
+    return 0;
+  if (pointIndex==pT->sides[2])
+    return 0;
+  area = triangleArea2(pArray,pT->sides[0],pT->sides[1],pT->sides[2]);
+  sum  = triangleArea2(pArray,pT->sides[0],pT->sides[1],pointIndex);
+  sum += triangleArea2(pArray,pT->sides[1],pT->sides[2],pointIndex);
+  sum += triangleArea2(pArray,pT->sides[0],pT->sides[2],pointIndex);
   if (area == sum)
     return 1;
   return 0;
 }
+
 
 static Triangle* createNewTriangle(int a, int b ,int c)
 {
@@ -136,13 +163,52 @@ static Triangle* createNewTriangle(int a, int b ,int c)
   return result;
 }
 
+
+static Point getCircumcenter(Point* pArray, Triangle* pT)
+{
+  struct Line l1,l2;
+  l1 = getLine(pArray[pT->sides[0]],pArray[pT->sides[1]]);
+  l2 = getLine(pArray[pT->sides[1]],pArray[pT->sides[2]]);
+  return getIntersection(l1,l2);
+}
+
+
 static double getSquareDistance(Point* pArray, int a, int b)
 {
   double p,q;
-  p = pArray[a]->x - pArray[b]->x;
-  q = pArray[a]->y - pArray[b]->y;
+  p = pArray[a].x - pArray[b].x;
+  q = pArray[a].y - pArray[b].y;
   return (p*p+q*q);
 }
+
+static double getSquareDistance2(Point a, Point b)
+{
+  double p,q;
+  p = a.x - b.x;
+  q = a.y - b.y;
+  return (p*p+q*q);
+}
+
+static int emptyCircle(Point* pArray, int numPoints, Triangle* pT)
+{
+  int i;
+  double sqDist;
+  Point center = getCircumcenter(pArray,pT);
+  sqDist = getSquareDistance2(center,pArray[pT->sides[0]]);
+  for (i=0;i<numPoints;)
+
+}
+
+static Triangle* addDelaunay(Point* pArray, int numPoints, Triangle* pT, int pointIndex)
+{
+  int i,j;
+  Triangle* trial[3];
+  trial[0] = createNewTriangle(pointIndex,pT->sides[0],pT->sides[0]);
+  trial[1] = createNewTriangle(pointIndex,pT->sides[0],pT->sides[1]);
+  trial[2] = createNewTriangle(pointIndex,pT->sides[1],pT->sides[2]);
+
+}
+
 
 static int findClosestTriangle(Point* pArray,Triangle** pTrArray, int pointIndex, int *pIsInside)
 {
@@ -235,8 +301,94 @@ Triangle** joinPointsIntoTriangles(Point* pArray, int numPoints)
   return result;
 }
 
+#endif
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <ctype.h>
+static size_t getLength(char* s, size_t* pSize)
+{
+    int i,result;
+    for (result=0,i=0;s[i];i++)
+    {
+        if (s[i]!='-')
+            result++;
+    }
+    *pSize=i;
+    return result;
+}
+
+char* licenseKeyFormatting(char* S, int K)
+{
+    int i,j,first,nDashes,count;
+    size_t n,size;
+    char* result,*temp;
+    n = getLength(S,&size);
+    first = n % K;
+    nDashes = (n / K)- 1;
+    if (first)
+        nDashes++;
+    printf("first==%i,n==%i,size==%i\n",first,n,size);
+    result = (char*)malloc((nDashes+n+1)*sizeof(char));
+    if (result)
+    {
+        result[nDashes+n]=0;
+        for (i=0,j=0;i<first;)
+        {
+            if (S[j]!='-')
+            {
+                if (isalpha(S[j]))
+                    result[i]=toupper(S[j]);
+                else
+                    result[i]=S[j];
+                i++;
+            }
+            j++;
+        }
+        if (result[i+1])
+        {
+            if (first)
+            {
+                printf("Putting the first dash\n");
+                result[i]='-';
+                i++;
+            }
+        }
+
+        temp = &result[i];
+        for (;S[j];)
+        {
+            for (i=0;S[j];)
+            {
+                if ((i>0)&&(i%K==0))
+                {
+
+                    temp[i]='-';
+                    i++;
+                    break;
+                }
+                if (S[j]!='-')
+                {
+                    if (isalpha(S[j]))
+                        temp[i]=toupper(S[j]);
+                    else
+                        temp[i]=S[j];
+                    i++;
+                }
+                j++;
+            }
+            temp = &temp[i];
+        }
+    }
+    printf("strlen(temp)==%i\n",strlen(temp));
+    return result;
+}
+
 
 int main(int argc, char* argv[])
 {
+  char* s = licenseKeyFormatting("2-5g-3-J",2);
+  printf("%s\n",s);
+  free(s);
   return 0;
 }
