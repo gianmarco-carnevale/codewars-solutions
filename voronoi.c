@@ -593,54 +593,140 @@ static int** getDelaunayTriangles(Point* pArray, unsigned numPoints, unsigned *p
     }
   }
   numTriangles = defrag(pTriplets,numTriplets);
+  *pNumTriangles = numTriangles;
   if (numTriangles==0)
   {
     free(pTriplets);
     return NULL;
   }
   pTriplets = (int**)realloc(pTriplets,numTriangles*sizeof(int*));
-  if (pTriplets)
-    *pNumTriangles = numTriangles;
+
   return pTriplets;
 }
 
-
-static int isInternal(int** pTriangles, unsigned numTriangles, int vertex)
+static int shareCommonEdge(int* pTriangle1, int* pTriangle2 /*, int* pv1, int* pv2*/)
 {
-  int i;
-  int** pMyOwnTriangles=NULL;
-  
+  int i,j,k,l;
+  for (i=0;i<3;i++)
+  {
+    for (j=i+1;j<3;j++)
+    {
+      for (k=0;k<3;k++)
+      {
+        for (l=k+1;l<3;l++)
+        {
+          if ((pTriangle1[i]==pTriangle2[k]) && (pTriangle1[j]==pTriangle2[l]))
+          {
+
+            return 0;
+          }
+        }
+      }
+    }
+  }
+  return 0;
 }
 
+static int** getTrianglesByVertex(int** pTriangles, unsigned numTriangles, int vertex, unsigned *pNumVertexTriangles)
+{
+  int i,j;
+  unsigned numVertexTriangles;
+  int** result;
+  for (i=0,numVertexTriangles=0,result=NULL;i<numTriangles;i++)
+  {
+    if ((vertex==pTriangles[i][0]) || (vertex==pTriangles[i][1]) || (vertex==pTriangles[i][2]))
+    {
+      if (result)
+      {
+        result = (int**)realloc(result,(numVertexTriangles+1)*sizeof(int*));
+        result[numVertexTriangles++]=pTriangles[i];
+      }
+      else
+      {
+        numVertexTriangles=1;
+        result = (int**)malloc(sizeof(int*));
+        result[0]=pTriangles[i];
+      }
+    }
+  }
+  *pNumVertexTriangles = numVertexTriangles;
+  return result;
+}
+
+
+static void sortByVertex(int** pTriangles, unsigned numTriangles, int vertex)
+{
+  unsigned count;
+  int i,first,second,repeat;
+  int* temp;
+  for (;;)
+  {
+    for (repeat=0,i=0;i<numTriangles-1;i++)
+    {
+      if (shareCommonEdge(pTriangles[i],pTriangles[i+1])==0)
+      {
+        repeat=1;
+        printf("not in common\n");
+        first = i+1;
+        if (first>numTriangles-1)
+          first = first - numTriangles;
+        second = i+2;
+        if (second>numTriangles-1)
+          second = second - numTriangles;
+        temp = pTriangles[first];
+        pTriangles[first] = pTriangles[second];
+        pTriangles[second] = temp;
+      }
+      else
+        printf("Common edge\n");
+    }
+    if (repeat==0)
+      return;
+  }
+}
 
 int main(int argc, char* argv[])
 {
   int i,j;
   unsigned Npoints;
-  unsigned numTriplets, numTriangles;
-  int ** pTriangles;
+  unsigned numTriangles, numVertexTriangles;
+  int ** pTriangles, **pVertexTriangles;
   double r;
 
   Point a1,a2,a3,b1,b2,b3;
   Point array[] = {
-    {2.0,2.0},
-    {2.0,5.0},
-    {5.0,5.0},
-    {5.0,2.0},
+    {1.0,4.0},
+    {5.0,4.0},
+    {1.1,1.1},
+    {4.1,1.2},
+    {3.0,3.0}
   };
   Npoints = sizeof(array)/sizeof(Point);
 
   pTriangles = getDelaunayTriangles(array,Npoints,&numTriangles);
   if (pTriangles)
   {
-    printf("Allocated %d triplets, got %d triangles\n",numTriplets,numTriangles);
+
+    printf("Got %d triangles\n",numTriangles);
     for (i=0;i<numTriangles;i++)
     {
       printf("(%f,%f)-",array[pTriangles[i][0]].x,array[pTriangles[i][0]].y);
       printf("(%f,%f)-",array[pTriangles[i][1]].x,array[pTriangles[i][1]].y);
       printf("(%f,%f)\n",array[pTriangles[i][2]].x,array[pTriangles[i][2]].y);
     }
+#if 1
+    for (i=0;i<Npoints;i++)
+    {
+      pVertexTriangles = getTrianglesByVertex(pTriangles,numTriangles,i,&numVertexTriangles);
+      sortByVertex(pVertexTriangles,numVertexTriangles,i);
+      for (j=0;j<numVertexTriangles;j++)
+        printf("%i,%i,%i - ",pTriangles[j][0],pTriangles[j][1],pTriangles[j][2]);
+      printf("\n");
+
+    }
+#endif
   }
+
 
   return 0;
 }
