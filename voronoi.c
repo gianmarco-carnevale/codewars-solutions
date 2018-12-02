@@ -31,6 +31,34 @@ struct Line
   double offset;
 };
 
+double getTriangleArea(Point a, Point b, Point c)
+{
+  Point d;
+  double result;
+  d.x = a.x - b.x;
+  d.y = a.y - b.y;
+  a.x = b.x - c.x;
+  a.y = b.y - c.y;
+  result = (d.x*a.y - d.y*a.x)/2.0;
+  return (result<0.0)?(-result):result;
+}
+
+static double getTriangleAreaFromArray(Point* pArray, int* triplet)
+{
+  Point p,q;
+  int a,b,c;
+  double result;
+  a = triplet[0];
+  b = triplet[1];
+  c = triplet[2];
+  p.x = pArray[a].x - pArray[b].x;
+  p.y = pArray[a].y - pArray[b].y;
+  q.x = pArray[b].x - pArray[c].x;
+  q.y = pArray[b].y - pArray[c].y;
+  result = (p.x*q.y - p.y*q.x)/2.0;
+  return (result<0.0)?(-result):result;
+}
+
 static struct Line getStraightLine(Point a, Point b)
 {
   struct Line result;
@@ -42,7 +70,7 @@ static struct Line getStraightLine(Point a, Point b)
   else
   {
     result.angular = (b.y - a.y)/(b.x - a.x);
-    result.offset = a.y - result.angular * a.x;
+    result.offset = a.y - (result.angular * a.x);
   }
   return result;
 }
@@ -88,7 +116,7 @@ static Point getIntersection(struct Line l1, struct Line l2)
       else
       {
         result.x = (l2.offset - l1.offset) / (l1.angular - l2.angular);
-        result.y = l1.angular * result.x + l1.offset;
+        result.y = (l1.angular * result.x) + l1.offset;
       }
     }
   }
@@ -123,7 +151,7 @@ static double getSquareDistance(Point a, Point b)
   double p,q;
   p = a.x - b.x;
   q = a.y - b.y;
-  return (p*p+q*q);
+  return (p*p)+(q*q);
 }
 
 static int samePoint(Point a, Point b)
@@ -170,19 +198,20 @@ static int getVertexBetweenLongerEdges(Point a, Point b, Point c)
 static Point getCircumcenter(Point a, Point b, Point c, double *pSquareRadius)
 {
   Point intersection;
-  switch (getVertexBetweenLongerEdges(a,b,c))
+  int v = getVertexBetweenLongerEdges(a,b,c);
+  switch (v)
   {
     case 0:
       intersection = getIntersection(getMedianLine(a,b),getMedianLine(a,c));
-      *pSquareRadius = getSquareDistance(a,b);
+      *pSquareRadius = getSquareDistance(a,intersection);
     break;
     case 1:
       intersection = getIntersection(getMedianLine(b,a),getMedianLine(b,c));
-      *pSquareRadius = getSquareDistance(b,a);
+      *pSquareRadius = getSquareDistance(b,intersection);
     break;
     case 2:
       intersection = getIntersection(getMedianLine(c,a),getMedianLine(c,b));
-      *pSquareRadius = getSquareDistance(c,a);
+      *pSquareRadius = getSquareDistance(c,intersection);
     break;
   }
   if (isinf(intersection.x))
@@ -282,23 +311,35 @@ char* licenseKeyFormatting(char* S, int K)
 #endif
 
 
-static int delaunay(int* pT, Point* pArray, int numPoints)
+static int delaunay(int* pTriplet, Point* pArray, int numPoints)
 {
   int i;
   Point a,b,c,center;
   double squareRadius;
-  a = pArray[pT[0]];
-  b = pArray[pT[1]];
-  c = pArray[pT[2]];
+  a = pArray[pTriplet[0]];
+  b = pArray[pTriplet[1]];
+  c = pArray[pTriplet[2]];
   center = getCircumcenter(a,b,c,&squareRadius);
+  printf("********* (%f,%f)(%f,%f)(%f,%f) *********\n",a.x,a.y,b.x,b.y,c.x,c.y);
+  printf("Circumcenter: (%f,%f), radius: %f\n",center.x,center.y,sqrt(squareRadius));
   for (i=0;i<numPoints;i++)
   {
+    printf("(%f,%f) ",pArray[i].x,pArray[i].y);
     if ((samePoint(pArray[i],a)==0) && (samePoint(pArray[i],b)==0) && (samePoint(pArray[i],c)==0))
     {
       if (getSquareDistance(center,pArray[i])<squareRadius)
       {
+        printf(" is inside the circle\n");
         return 0;
       }
+      else
+      {
+        printf(" is outside the circle\n");
+      }
+    }
+    else
+    {
+      printf("is one of the vertices\n");
     }
   }
   return 1;
@@ -328,7 +369,6 @@ static unsigned binomial(unsigned n, unsigned k)
 
 static int getThirdVertex(int a, int b)
 {
-  printf("third(%i,%i)\n",a,b);
   switch (a)
   {
     case 0:
@@ -385,17 +425,21 @@ static int redundant(Point a1, Point a2, Point a3, Point b1, Point b2, Point b3)
             printf("Common edge: (%f,%f)-(%f,%f)\n",first[i].x,first[i].y,first[j].x,first[j].y);
             t1 = getThirdVertex(i,j);
             t2 = getThirdVertex(k,l);
-            printf("t1==%i, t2==%i\n",t1,t2);
             third1 = first[t1];
             third2 = second[t2];
             printf("Other vertex: (%f,%f)\n",third1.x,third1.y);
             printf("Other vertex: (%f,%f)\n",third2.x,third2.y);
             edge = getStraightLine(first[i],first[j]);
-            printf("Common edge line: %f x + %f\n",edge.angular,edge.offset);
             if (areParted(third1,third2,edge))
+            {
+              printf("Parted, no cancellation\n");
               return 0;
+            }
             else
+            {
+              printf("On the same side, cancel\n");
               return 1;
+            }
           }
         }
       }
@@ -498,17 +542,105 @@ static void deleteTriplets(int** p, unsigned length)
   free(p);
 }
 
+static int** getDelaunayTriangles(Point* pArray, unsigned numPoints, unsigned *pNumTriangles)
+{
+  unsigned numTriplets,numTriangles;
+  int i,j;
+  int** pTriplets;
+  Point a1,a2,a3,b1,b2,b3;
+  pTriplets = generateTriplets(numPoints,&numTriplets);
+  if (pTriplets)
+  {
+    for (i=0;i<numTriplets;i++)
+    {
+      if (getTriangleAreaFromArray(pArray,pTriplets[i])>0.0)
+      {
+        if (delaunay(pTriplets[i],pArray,numPoints)==0)
+        {
+          free(pTriplets[i]);
+          pTriplets[i]=NULL;
+        }
+      }
+      else
+      {
+        printf("Three points aligned\n");
+        free(pTriplets[i]);
+        pTriplets[i]=NULL;
+      }
+    }
+    for (i=0;i<numTriplets;i++)
+    {
+      for (j=i+1;j<numTriplets;j++)
+      {
+        if (pTriplets[i])
+        {
+          if (pTriplets[j])
+          {
+            a1 = pArray[pTriplets[i][0]];
+            a2 = pArray[pTriplets[i][1]];
+            a3 = pArray[pTriplets[i][2]];
+            b1 = pArray[pTriplets[j][0]];
+            b2 = pArray[pTriplets[j][1]];
+            b3 = pArray[pTriplets[j][2]];
+            if (redundant(a1,a2,a3,b1,b2,b3))
+            {
+              free(pTriplets[j]);
+              pTriplets[j]=NULL;
+            }
+          }
+        }
+      }
+    }
+  }
+  numTriangles = defrag(pTriplets,numTriplets);
+  if (numTriangles==0)
+  {
+    free(pTriplets);
+    return NULL;
+  }
+  pTriplets = (int**)realloc(pTriplets,numTriangles*sizeof(int*));
+  if (pTriplets)
+    *pNumTriangles = numTriangles;
+  return pTriplets;
+}
+
+
+static int isInternal(int** pTriangles, unsigned numTriangles, int vertex)
+{
+  int i;
+  int** pMyOwnTriangles=NULL;
+  
+}
+
+
 int main(int argc, char* argv[])
 {
-  int i,n;
-  Point a = {2.0,2.0};
-  Point b = {5.0,5.0};
-  Point c = {9.0,4.0};
-  Point d = {6.0,1.0};
-  printf("redundant==%i\n",redundant(a,b,c,a,c,d));
+  int i,j;
+  unsigned Npoints;
+  unsigned numTriplets, numTriangles;
+  int ** pTriangles;
+  double r;
 
+  Point a1,a2,a3,b1,b2,b3;
+  Point array[] = {
+    {2.0,2.0},
+    {2.0,5.0},
+    {5.0,5.0},
+    {5.0,2.0},
+  };
+  Npoints = sizeof(array)/sizeof(Point);
 
-
+  pTriangles = getDelaunayTriangles(array,Npoints,&numTriangles);
+  if (pTriangles)
+  {
+    printf("Allocated %d triplets, got %d triangles\n",numTriplets,numTriangles);
+    for (i=0;i<numTriangles;i++)
+    {
+      printf("(%f,%f)-",array[pTriangles[i][0]].x,array[pTriangles[i][0]].y);
+      printf("(%f,%f)-",array[pTriangles[i][1]].x,array[pTriangles[i][1]].y);
+      printf("(%f,%f)\n",array[pTriangles[i][2]].x,array[pTriangles[i][2]].y);
+    }
+  }
 
   return 0;
 }
