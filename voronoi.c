@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#if 0
+
 
 #if 0
 
@@ -25,18 +25,29 @@ y=bx+k
 #endif
 typedef struct { double x,y; } Point;
 
-typedef struct
-{
-  int sides[3];
-} Triangle;
-
 struct Line
 {
   double angular;
   double offset;
 };
 
-static struct Line getLine(Point a, Point b)
+static struct Line getStraightLine(Point a, Point b)
+{
+  struct Line result;
+  if (a.x == b.x)
+  {
+    result.angular = INFINITY;
+    result.offset = a.x;
+  }
+  else
+  {
+    result.angular = (b.y - a.y)/(b.x - a.x);
+    result.offset = a.y - result.angular * a.x;
+  }
+  return result;
+}
+
+static struct Line getMedianLine(Point a, Point b)
 {
   struct Line result;
   if (a.y == b.y)
@@ -84,6 +95,29 @@ static Point getIntersection(struct Line l1, struct Line l2)
   return result;
 }
 
+static int areParted(Point a,Point b, struct Line l)
+{
+  double ya,yb;
+  if (isinf(l.angular))
+  {
+    if ((a.x < l.offset) && (b.x > l.offset))
+      return 1;
+    if ((a.x > l.offset) && (b.x < l.offset))
+      return 1;
+    return 0;
+  }
+  else
+  {
+    ya = l.angular * a.x + l.offset;
+    yb = l.angular * b.x + l.offset;
+    if ((ya > a.y) && (yb < b.y))
+      return 1;
+    if ((ya < a.y) && (yb > b.y))
+      return 1;
+    return 0;
+  }
+}
+
 static double getSquareDistance(Point a, Point b)
 {
   double p,q;
@@ -92,216 +126,78 @@ static double getSquareDistance(Point a, Point b)
   return (p*p+q*q);
 }
 
-static Point getCircumcenter(Point a, Point b, Point c, double *pRadius)
+static int samePoint(Point a, Point b)
 {
-  struct Line l1,l2,l3;
-  Point int1,int2,int3;
-  l1 = getLine(a,b);
-  l2 = getLine(b,c);
-  l3 = getLine(a,c);
-  int1 = getIntersection(l1,l2);
-  int2 = getIntersection(l2,l3);
-  int3 = getIntersection(l1,l3);
-  if (isinf(int1))
-  {
-    printf("WARNING: circumcenter");
-    *pRadius=INFINITY;
-    return int1;
-  }
-  if ((int1==int2)&&(int2==int3))
-  {
-    *pRadius = getSquareDistance(int1,a);
-    return int1;
-  }
-  printf("WARNING: unprecise circumcenter calculation\n");
-  *pRadius = getSquareDistance(int1,a);
-  return int1;
-}
-
-
-static double triangleArea2(Point* pArray, int a, int b, int c)
-{
-  Point p,q;
-  double result;
-  p.x = pArray[a].x - pArray[b].x;
-  p.y = pArray[a].y - pArray[b].y;
-  q.x = pArray[b].x - pArray[c].x;
-  q.y = pArray[b].y - pArray[c].y;
-  result = (p.x*q.y - p.y*q.x)/2.0;
-  return (result<0.0)?(-result):result;
-}
-
-static int isInside(Point* pArray, Triangle* pT, int pointIndex)
-{
-  double area,sum;
-  if (pointIndex==pT->sides[0])
-    return 0;
-  if (pointIndex==pT->sides[1])
-    return 0;
-  if (pointIndex==pT->sides[2])
-    return 0;
-  area = triangleArea2(pArray,pT->sides[0],pT->sides[1],pT->sides[2]);
-  sum  = triangleArea2(pArray,pT->sides[0],pT->sides[1],pointIndex);
-  sum += triangleArea2(pArray,pT->sides[1],pT->sides[2],pointIndex);
-  sum += triangleArea2(pArray,pT->sides[0],pT->sides[2],pointIndex);
-  if (area == sum)
+  if ((a.x==b.x)&&(a.y==b.y))
     return 1;
   return 0;
 }
 
-
-static Triangle* createNewTriangle(int a, int b ,int c)
+static int getVertexBetweenLongerEdges(Point a, Point b, Point c)
 {
-  Triangle* result;
-  result = (Triangle*)malloc(sizeof(Triangle));
-  if (result)
+  double sqDistAB, sqDistAC, sqDistBC;
+  sqDistAB = getSquareDistance(a,b);
+  sqDistAC = getSquareDistance(a,c);
+  sqDistBC = getSquareDistance(b,c);
+  if (sqDistAB < sqDistAC)
   {
-    result->sides[0]=a;
-    result->sides[1]=b;
-    result->sides[2]=c;
-  }
-  return result;
-}
-
-
-static Point getCircumcenter(Point* pArray, Triangle* pT)
-{
-  struct Line l1,l2;
-  l1 = getLine(pArray[pT->sides[0]],pArray[pT->sides[1]]);
-  l2 = getLine(pArray[pT->sides[1]],pArray[pT->sides[2]]);
-  return getIntersection(l1,l2);
-}
-
-
-static double getSquareDistance(Point* pArray, int a, int b)
-{
-  double p,q;
-  p = pArray[a].x - pArray[b].x;
-  q = pArray[a].y - pArray[b].y;
-  return (p*p+q*q);
-}
-
-static double getSquareDistance2(Point a, Point b)
-{
-  double p,q;
-  p = a.x - b.x;
-  q = a.y - b.y;
-  return (p*p+q*q);
-}
-
-static int emptyCircle(Point* pArray, int numPoints, Triangle* pT)
-{
-  int i;
-  double sqDist;
-  Point center = getCircumcenter(pArray,pT);
-  sqDist = getSquareDistance2(center,pArray[pT->sides[0]]);
-  for (i=0;i<numPoints;)
-
-}
-
-static Triangle* addDelaunay(Point* pArray, int numPoints, Triangle* pT, int pointIndex)
-{
-  int i,j;
-  Triangle* trial[3];
-  trial[0] = createNewTriangle(pointIndex,pT->sides[0],pT->sides[0]);
-  trial[1] = createNewTriangle(pointIndex,pT->sides[0],pT->sides[1]);
-  trial[2] = createNewTriangle(pointIndex,pT->sides[1],pT->sides[2]);
-
-}
-
-
-static int findClosestTriangle(Point* pArray,Triangle** pTrArray, int pointIndex, int *pIsInside)
-{
-  int i,j,n,closest;
-  Triangle* pTriangle;
-  double sqDist=INFINITY;
-  double temp;
-  *pIsInside=0;
-  for (i=0,pTriangle=pTrArray[i];pTriangle;i++,pTriangle=pTrArray[i])
-  {
-    if (isInside(pArray,pTriangle,pointIndex))
+    if (sqDistBC < sqDistAB)
     {
-      *pIsInside=1;
-      return i;
+      /* sqDistBC < sqDistAB < sqDistAC */
+      return 0;
     }
-    for (j=0;j<3;j++)
+    else
     {
-      temp = getSquareDistance(pArray,pointIndex,pTriangle->sides[j]);
-      if (temp<sqDist)
-      {
-        sqDist = temp;
-        closest=i;
-      }
+      /* sqDistAB < sqDistAC and sqDistAB <= sqDistBC */
+      return 2;
     }
   }
-  return closest;
-}
-
-Triangle** joinPointsIntoTriangles(Point* pArray, int numPoints)
-{
-  Triangle** result;
-  /* this pointer will be non-null if there is at least one triangle */
-  /* if no triangles can be formed, null pointer shall be returned */
-  int i,j,numTriangles,index,closest,isInside;
-  if (pArray==NULL)
-    return NULL;
-  if (numPoints<3)
-    return NULL;
-  /* so from now on it is guaranteed that numPoints is equal to 3 or greater */
-  numTriangles = numPoints-2;
-  result = (Triangle**)malloc(numTriangles*sizeof(Triangle*));
-  if (result)
+  else
   {
-    for (i=0;i<numTriangles;i++)
+    /* sqDistAC <= sqDistAB */
+    if (sqDistBC < sqDistAC)
     {
-      result[i]=NULL;
+      return 0;
     }
-
-    for (index=0,i=0;i<numPoints;i++)
+    else
     {
-      /* check if there are triangles available */
-      if (index>0)
-      {
-        /* find the closest triangle */
-        closest = findClosestTriangle(pArray,result,i,&isInside);
-        if (isInside)
-        {
-
-        }
-        else
-        {
-          /* now let's choose the common side
-             between the existing triangle and the new one which we are about to create */
-        }
-        /* let's also connect vertex of existing triangles to form new ones */
-
-
-
-      }
-      else
-      {
-        /* no triangles, just aligned points which cannot form any triangle
-           let's see if a new triangle can be formed now */
-        if ((i>2) && (triangleArea(pArray,i,i-1,i-2)>0.0))
-        {
-          result[index]=createNewTriangle(i,i-1,i-2);
-          if (result[index])
-          {
-            index++;
-          }
-          else
-          {
-            printf("ERROR: malloc\n");
-            return result;
-          }
-        }
-      }
+      /* sqDistAC <= sqDistAB and sqDistAC <= sqDistBC */
+      return 1;
     }
   }
-  return result;
 }
 
-#endif
+static Point getCircumcenter(Point a, Point b, Point c, double *pSquareRadius)
+{
+  Point intersection;
+  switch (getVertexBetweenLongerEdges(a,b,c))
+  {
+    case 0:
+      intersection = getIntersection(getMedianLine(a,b),getMedianLine(a,c));
+      *pSquareRadius = getSquareDistance(a,b);
+    break;
+    case 1:
+      intersection = getIntersection(getMedianLine(b,a),getMedianLine(b,c));
+      *pSquareRadius = getSquareDistance(b,a);
+    break;
+    case 2:
+      intersection = getIntersection(getMedianLine(c,a),getMedianLine(c,b));
+      *pSquareRadius = getSquareDistance(c,a);
+    break;
+  }
+  if (isinf(intersection.x))
+  {
+    printf("WARNING: circumcenter with infinite radius\n");
+    *pSquareRadius=INFINITY;
+  }
+  return intersection;
+}
+
+
+
+
+#if 0
+
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -383,12 +279,236 @@ char* licenseKeyFormatting(char* S, int K)
     printf("strlen(temp)==%i\n",strlen(temp));
     return result;
 }
+#endif
 
+
+static int delaunay(int* pT, Point* pArray, int numPoints)
+{
+  int i;
+  Point a,b,c,center;
+  double squareRadius;
+  a = pArray[pT[0]];
+  b = pArray[pT[1]];
+  c = pArray[pT[2]];
+  center = getCircumcenter(a,b,c,&squareRadius);
+  for (i=0;i<numPoints;i++)
+  {
+    if ((samePoint(pArray[i],a)==0) && (samePoint(pArray[i],b)==0) && (samePoint(pArray[i],c)==0))
+    {
+      if (getSquareDistance(center,pArray[i])<squareRadius)
+      {
+        return 0;
+      }
+    }
+  }
+  return 1;
+}
+
+static unsigned binomial(unsigned n, unsigned k)
+{
+  unsigned i;
+  unsigned result;
+  if (k>n)
+  {
+    printf("ERROR: invalid binomial arguments\n");
+    return 0;
+  }
+  if (k==0)
+    return 1;
+  for (result=1,i=0;i<k;i++)
+  {
+    result = result * (n-i);
+  }
+  for (;k>1;k--)
+  {
+    result = result / k;
+  }
+  return result;
+}
+
+static int getThirdVertex(int a, int b)
+{
+  printf("third(%i,%i)\n",a,b);
+  switch (a)
+  {
+    case 0:
+      switch (b)
+      {
+        case 1: return 2;
+        case 2: return 1;
+        default: return -1;
+      }
+    break;
+    case 1:
+      switch (b)
+      {
+        case 0: return 2;
+        case 2: return 0;
+        default: return -1;
+      }
+    break;
+    case 2:
+      switch (b)
+      {
+        case 0: return 1;
+        case 1: return 0;
+        default: return -1;
+      }
+    break;
+    default: return -1;
+  }
+}
+
+static int redundant(Point a1, Point a2, Point a3, Point b1, Point b2, Point b3)
+{
+  struct Line edge;
+  int i,j,k,l,t1,t2;
+  Point first[3];
+  Point second[3];
+  Point third1, third2;
+  first[0] = a1;
+  first[1] = a2;
+  first[2] = a3;
+  second[0] = b1;
+  second[1] = b2;
+  second[2] = b3;
+  for (i=0;i<3;i++)
+  {
+    for (j=i+1;j<3;j++)
+    {
+      for (k=0;k<3;k++)
+      {
+        for (l=k+1;l<3;l++)
+        {
+          if ((samePoint(first[i],second[k])==1) && (samePoint(first[j],second[l])==1))
+          {
+            printf("Common edge: (%f,%f)-(%f,%f)\n",first[i].x,first[i].y,first[j].x,first[j].y);
+            t1 = getThirdVertex(i,j);
+            t2 = getThirdVertex(k,l);
+            printf("t1==%i, t2==%i\n",t1,t2);
+            third1 = first[t1];
+            third2 = second[t2];
+            printf("Other vertex: (%f,%f)\n",third1.x,third1.y);
+            printf("Other vertex: (%f,%f)\n",third2.x,third2.y);
+            edge = getStraightLine(first[i],first[j]);
+            printf("Common edge line: %f x + %f\n",edge.angular,edge.offset);
+            if (areParted(third1,third2,edge))
+              return 0;
+            else
+              return 1;
+          }
+        }
+      }
+    }
+  }
+  return 0;
+}
+#define MAX_POINTS 100
+static int** generateTriplets(unsigned n, unsigned* pLength)
+{
+  int i,j,k,count;
+  unsigned length;
+  int** result;
+  if (n>MAX_POINTS)
+  {
+    printf("ERROR: too many triplets\n");
+    *pLength = 0;
+    return NULL;
+  }
+  if (n<3)
+  {
+    *pLength = 0;
+    return NULL;
+  }
+  length = binomial(n,3);
+  *pLength = length;
+  result = (int**)calloc(length,sizeof(int*));
+  if (result)
+  {
+    count = 0;
+    for (i=0;i<n;i++)
+    {
+      for (j=i+1;j<n;j++)
+      {
+        for (k=j+1;k<n;k++)
+        {
+          result[count]=(int*)malloc(3*sizeof(int));
+          if (result[count])
+          {
+            result[count][0] = i;
+            result[count][1] = j;
+            result[count][2] = k;
+            count++;
+          }
+          else
+          {
+            printf("ERROR: malloc failed for %i,%i,%i\n",i,j,k);
+            return result;
+          }
+        }
+      }
+    }
+  }
+  return result;
+}
+
+static int defrag(int** p, int length)
+{
+  int i,lastFree,newLength;
+  for (i=0,lastFree=-1;i<length;i++)
+  {
+    if (lastFree<0)
+    {
+      if (p[i])
+      {
+        continue;
+      }
+      else
+      {
+        lastFree = i;
+      }
+    }
+    else
+    {
+      if (p[i])
+      {
+        p[lastFree++]=p[i];
+        p[i]=NULL;
+        newLength = lastFree;
+      }
+      else
+      {
+        continue;
+      }
+    }
+  }
+  if (lastFree<0)
+    return length;
+  return newLength;
+}
+
+static void deleteTriplets(int** p, unsigned length)
+{
+  int i;
+  for (i=0;i<length;i++)
+  {
+    if (p[i])
+      free(p[i]);
+  }
+  free(p);
+}
 
 int main(int argc, char* argv[])
 {
-  char* s = licenseKeyFormatting("2-5g-3-J",2);
-  printf("%s\n",s);
-  free(s);
+  int i,n;
+  Point a = {2.0,2.0};
+  Point b = {5.0,5.0};
+  Point c = {9.0,4.0};
+  Point d = {6.0,1.0};
+  printf("redundant==%i\n",redundant(a,b,c,a,c,d));
+
+
+
+
   return 0;
 }
