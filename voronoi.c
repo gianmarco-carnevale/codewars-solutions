@@ -3,26 +3,6 @@
 #include <string.h>
 #include <math.h>
 
-
-#if 0
-
-x0,y0
-x1,y1
-
-a=(y1-y0)/(x1-x0)
-
-(x0+x1)/2
-(y0+y1)/2
-
-b = (x0-x1)/(y1-y0)
-
-
-y=bx+k
-
-(y0+y1)/2 =  (x0-x1)*(x0+x1)/2*(y1-y0)+k
-
-
-#endif
 typedef struct { double x,y; } Point;
 
 struct Line
@@ -31,7 +11,7 @@ struct Line
   double offset;
 };
 
-double getTriangleArea(Point a, Point b, Point c)
+static double getTriangleArea(Point a, Point b, Point c)
 {
   Point d;
   double result;
@@ -198,6 +178,14 @@ static int getVertexBetweenLongerEdges(Point a, Point b, Point c)
 static Point getCircumcenter(Point a, Point b, Point c, double *pSquareRadius)
 {
   Point intersection;
+  if (samePoint(a,b) || samePoint(b,c) || samePoint(a,c))
+  {
+    printf("WARNING: at least two vertices are the same\n");
+    *pSquareRadius=INFINITY;
+    intersection.x=INFINITY;
+    intersection.y=INFINITY;
+    return intersection;
+  }
   int v = getVertexBetweenLongerEdges(a,b,c);
   switch (v)
   {
@@ -214,102 +202,15 @@ static Point getCircumcenter(Point a, Point b, Point c, double *pSquareRadius)
       *pSquareRadius = getSquareDistance(c,intersection);
     break;
   }
-  if (isinf(intersection.x))
+  if (isinf(intersection.x)||isinf(intersection.y))
   {
-    printf("WARNING: circumcenter with infinite radius\n");
+    printf("WARNING: vertices are aligned and do not form a triangle\n");
+    intersection.x=INFINITY;
+    intersection.y=INFINITY;
     *pSquareRadius=INFINITY;
   }
   return intersection;
 }
-
-
-
-
-#if 0
-
-
-#include <stdlib.h>
-#include <stdio.h>
-#include <ctype.h>
-static size_t getLength(char* s, size_t* pSize)
-{
-    int i,result;
-    for (result=0,i=0;s[i];i++)
-    {
-        if (s[i]!='-')
-            result++;
-    }
-    *pSize=i;
-    return result;
-}
-
-char* licenseKeyFormatting(char* S, int K)
-{
-    int i,j,first,nDashes,count;
-    size_t n,size;
-    char* result,*temp;
-    n = getLength(S,&size);
-    first = n % K;
-    nDashes = (n / K)- 1;
-    if (first)
-        nDashes++;
-    printf("first==%i,n==%i,size==%i\n",first,n,size);
-    result = (char*)malloc((nDashes+n+1)*sizeof(char));
-    if (result)
-    {
-        result[nDashes+n]=0;
-        for (i=0,j=0;i<first;)
-        {
-            if (S[j]!='-')
-            {
-                if (isalpha(S[j]))
-                    result[i]=toupper(S[j]);
-                else
-                    result[i]=S[j];
-                i++;
-            }
-            j++;
-        }
-        if (result[i+1])
-        {
-            if (first)
-            {
-                printf("Putting the first dash\n");
-                result[i]='-';
-                i++;
-            }
-        }
-
-        temp = &result[i];
-        for (;S[j];)
-        {
-            for (i=0;S[j];)
-            {
-                if ((i>0)&&(i%K==0))
-                {
-
-                    temp[i]='-';
-                    i++;
-                    break;
-                }
-                if (S[j]!='-')
-                {
-                    if (isalpha(S[j]))
-                        temp[i]=toupper(S[j]);
-                    else
-                        temp[i]=S[j];
-                    i++;
-                }
-                j++;
-            }
-            temp = &temp[i];
-        }
-    }
-    printf("strlen(temp)==%i\n",strlen(temp));
-    return result;
-}
-#endif
-
 
 static int delaunay(int* pTriplet, Point* pArray, int numPoints)
 {
@@ -320,26 +221,21 @@ static int delaunay(int* pTriplet, Point* pArray, int numPoints)
   b = pArray[pTriplet[1]];
   c = pArray[pTriplet[2]];
   center = getCircumcenter(a,b,c,&squareRadius);
+  /*
   printf("********* (%f,%f)(%f,%f)(%f,%f) *********\n",a.x,a.y,b.x,b.y,c.x,c.y);
   printf("Circumcenter: (%f,%f), radius: %f\n",center.x,center.y,sqrt(squareRadius));
+  */
   for (i=0;i<numPoints;i++)
   {
+    /*
     printf("(%f,%f) ",pArray[i].x,pArray[i].y);
+    */
     if ((samePoint(pArray[i],a)==0) && (samePoint(pArray[i],b)==0) && (samePoint(pArray[i],c)==0))
     {
       if (getSquareDistance(center,pArray[i])<squareRadius)
       {
-        printf(" is inside the circle\n");
         return 0;
       }
-      else
-      {
-        printf(" is outside the circle\n");
-      }
-    }
-    else
-    {
-      printf("is one of the vertices\n");
     }
   }
   return 1;
@@ -447,6 +343,7 @@ static int redundant(Point a1, Point a2, Point a3, Point b1, Point b2, Point b3)
   }
   return 0;
 }
+
 #define MAX_POINTS 100
 static int** generateTriplets(unsigned n, unsigned* pLength)
 {
@@ -563,7 +460,6 @@ static int** getDelaunayTriangles(Point* pArray, unsigned numPoints, unsigned *p
       }
       else
       {
-        printf("Three points aligned\n");
         free(pTriplets[i]);
         pTriplets[i]=NULL;
       }
@@ -600,13 +496,15 @@ static int** getDelaunayTriangles(Point* pArray, unsigned numPoints, unsigned *p
     return NULL;
   }
   pTriplets = (int**)realloc(pTriplets,numTriangles*sizeof(int*));
-
   return pTriplets;
 }
 
 static int shareCommonEdge(int* pTriangle1, int* pTriangle2 /*, int* pv1, int* pv2*/)
 {
   int i,j,k,l;
+  /*
+  printf("(%i,%i,%i) and (%i,%i,%i) ",pTriangle1[0],pTriangle1[1],pTriangle1[2],pTriangle2[0],pTriangle2[1],pTriangle2[2]);
+  */
   for (i=0;i<3;i++)
   {
     for (j=i+1;j<3;j++)
@@ -617,13 +515,18 @@ static int shareCommonEdge(int* pTriangle1, int* pTriangle2 /*, int* pv1, int* p
         {
           if ((pTriangle1[i]==pTriangle2[k]) && (pTriangle1[j]==pTriangle2[l]))
           {
-
-            return 0;
+/*
+            printf("share an edge\n");
+            */
+            return 1;
           }
         }
       }
     }
   }
+  /*
+  printf("do not share an edge\n");
+  */
   return 0;
 }
 
@@ -653,36 +556,92 @@ static int** getTrianglesByVertex(int** pTriangles, unsigned numTriangles, int v
   return result;
 }
 
+static int hasVertex(int* pTriangle, int vertex)
+{
+  if (vertex<0)
+  {
+    printf("ERROR: invalid vertex");
+    return 0;
+  }
+  if (vertex>2)
+  {
+    printf("ERROR: invalid vertex");
+    return 0;
+  }
+  if (pTriangle[0]==vertex)
+    return 1;
+  if (pTriangle[1]==vertex)
+    return 1;
+  if (pTriangle[2]==vertex)
+    return 1;
+  return 0;
+}
 
 static void sortByVertex(int** pTriangles, unsigned numTriangles, int vertex)
 {
-  unsigned count;
-  int i,first,second,repeat;
+  int i,j;
   int* temp;
-  for (;;)
+  for (i=0;i<numTriangles-1;i++)
   {
-    for (repeat=0,i=0;i<numTriangles-1;i++)
+    /*
+    printf("checking (%i,%i,%i) with (%i,%i,%i)\n",pTriangles[i][0],pTriangles[i][1],pTriangles[i][2],pTriangles[i+1][0],pTriangles[i+1][1],pTriangles[i+1][2]);
+    */
+    if (shareCommonEdge(pTriangles[i],pTriangles[i+1]))
     {
-      if (shareCommonEdge(pTriangles[i],pTriangles[i+1])==0)
-      {
-        repeat=1;
-        printf("not in common\n");
-        first = i+1;
-        if (first>numTriangles-1)
-          first = first - numTriangles;
-        second = i+2;
-        if (second>numTriangles-1)
-          second = second - numTriangles;
-        temp = pTriangles[first];
-        pTriangles[first] = pTriangles[second];
-        pTriangles[second] = temp;
-      }
-      else
-        printf("Common edge\n");
+      continue;
     }
-    if (repeat==0)
-      return;
+    else
+    {
+      for (j=i+2;j<numTriangles;j++)
+      {
+        if (shareCommonEdge(pTriangles[i],pTriangles[j]))
+        {
+          /*
+          printf("Found (%i,%i,%i) to swap with (%i,%i,%i)\n",pTriangles[j][0],pTriangles[j][1],pTriangles[j][2],pTriangles[i+1][0],pTriangles[i+1][1],pTriangles[i+1][2]);
+          */
+          temp = pTriangles[i+1];
+          pTriangles[i+1] = pTriangles[j];
+          pTriangles[j] = temp;
+          break;
+        }
+      }
+    }
   }
+}
+
+static double voronoiArea(Point* pArray, int** pTriangles, unsigned numTriangles, int vertex)
+{
+  int i;
+  Point a1,a2,a3,b1,b2,b3,c1,c2;
+  double sum,sqRadius;
+  if (numTriangles<3)
+    return -1.0;
+  sortByVertex(pTriangles,numTriangles,vertex);
+  if (shareCommonEdge(pTriangles[0],pTriangles[numTriangles-1])==0)
+    return -1.0;
+
+  for (sum=0,i=1;i<numTriangles;i++)
+  {
+    a1 = pArray[pTriangles[i-1][0]];
+    a2 = pArray[pTriangles[i-1][1]];
+    a3 = pArray[pTriangles[i-1][2]];
+    b1 = pArray[pTriangles[i][0]];
+    b2 = pArray[pTriangles[i][1]];
+    b3 = pArray[pTriangles[i][2]];
+    c1 = getCircumcenter(a1,a2,a3,&sqRadius);
+    c2 = getCircumcenter(b1,b2,b3,&sqRadius);
+    sum += getTriangleArea(c1,c2,pArray[vertex]);
+  }
+  a1 = pArray[pTriangles[numTriangles-1][0]];
+  a2 = pArray[pTriangles[numTriangles-1][1]];
+  a3 = pArray[pTriangles[numTriangles-1][2]];
+  b1 = pArray[pTriangles[0][0]];
+  b2 = pArray[pTriangles[0][1]];
+  b3 = pArray[pTriangles[0][2]];
+  c1 = getCircumcenter(a1,a2,a3,&sqRadius);
+  c2 = getCircumcenter(b1,b2,b3,&sqRadius);
+  sum += getTriangleArea(c1,c2,pArray[vertex]);
+  return sum;
 }
 
 int main(int argc, char* argv[])
@@ -695,11 +654,7 @@ int main(int argc, char* argv[])
 
   Point a1,a2,a3,b1,b2,b3;
   Point array[] = {
-    {1.0,4.0},
-    {5.0,4.0},
-    {1.1,1.1},
-    {4.1,1.2},
-    {3.0,3.0}
+  {0.0, 0.0}, {2.0, 0.0}, {-2.0, 0.0}, {0.0, 2.0}, {0.0, -2.0}
   };
   Npoints = sizeof(array)/sizeof(Point);
 
@@ -718,11 +673,14 @@ int main(int argc, char* argv[])
     for (i=0;i<Npoints;i++)
     {
       pVertexTriangles = getTrianglesByVertex(pTriangles,numTriangles,i,&numVertexTriangles);
-      sortByVertex(pVertexTriangles,numVertexTriangles,i);
-      for (j=0;j<numVertexTriangles;j++)
-        printf("%i,%i,%i - ",pTriangles[j][0],pTriangles[j][1],pTriangles[j][2]);
-      printf("\n");
+      printf("--------------------------------------------------\n");
 
+      printf("Vertex %i: ",i);
+      for (j=0;j<numVertexTriangles;j++)
+      {
+        printf("%i,%i,%i - ",pVertexTriangles[j][0],pVertexTriangles[j][1],pVertexTriangles[j][2]);
+      }
+      printf(", Voronoi area: %f\n",voronoiArea(array,pVertexTriangles,numVertexTriangles,i));
     }
 #endif
   }
