@@ -3,6 +3,9 @@
 #include <string.h>
 #include <math.h>
 
+#define MAX_POINTS 100
+#define MAX_SQUARE_DOUBLE (0.000000001)
+
 typedef struct { double x,y; } Point;
 
 struct Line
@@ -212,11 +215,13 @@ static Point getCircumcenter(Point a, Point b, Point c, double *pSquareRadius)
   return intersection;
 }
 
+
+
 static int delaunay(int* pTriplet, Point* pArray, int numPoints)
 {
   int i;
   Point a,b,c,center;
-  double squareRadius;
+  double squareRadius,delta;
   a = pArray[pTriplet[0]];
   b = pArray[pTriplet[1]];
   c = pArray[pTriplet[2]];
@@ -232,7 +237,8 @@ static int delaunay(int* pTriplet, Point* pArray, int numPoints)
     */
     if ((samePoint(pArray[i],a)==0) && (samePoint(pArray[i],b)==0) && (samePoint(pArray[i],c)==0))
     {
-      if (getSquareDistance(center,pArray[i])<squareRadius)
+      delta = squareRadius - getSquareDistance(center,pArray[i]);
+      if (delta>MAX_SQUARE_DOUBLE)
       {
         return 0;
       }
@@ -344,7 +350,7 @@ static int redundant(Point a1, Point a2, Point a3, Point b1, Point b2, Point b3)
   return 0;
 }
 
-#define MAX_POINTS 100
+
 static int** generateTriplets(unsigned n, unsigned* pLength)
 {
   int i,j,k,count;
@@ -450,7 +456,7 @@ static int** getDelaunayTriangles(Point* pArray, unsigned numPoints, unsigned *p
   {
     for (i=0;i<numTriplets;i++)
     {
-      if (getTriangleAreaFromArray(pArray,pTriplets[i])>0.0)
+      if (getTriangleAreaFromArray(pArray,pTriplets[i])>MAX_SQUARE_DOUBLE)
       {
         if (delaunay(pTriplets[i],pArray,numPoints)==0)
         {
@@ -577,18 +583,18 @@ static int hasVertex(int* pTriangle, int vertex)
   return 0;
 }
 
-static void sortByVertex(int** pTriangles, unsigned numTriangles, int vertex)
+static int sortByVertex(int** pTriangles, unsigned numTriangles, int vertex)
 {
-  int i,j;
+  int i,j,count;
   int* temp;
-  for (i=0;i<numTriangles-1;i++)
+  for (count=0,i=0;i<numTriangles-1;i++)
   {
     /*
     printf("checking (%i,%i,%i) with (%i,%i,%i)\n",pTriangles[i][0],pTriangles[i][1],pTriangles[i][2],pTriangles[i+1][0],pTriangles[i+1][1],pTriangles[i+1][2]);
     */
     if (shareCommonEdge(pTriangles[i],pTriangles[i+1]))
     {
-      continue;
+      count++;
     }
     else
     {
@@ -599,6 +605,7 @@ static void sortByVertex(int** pTriangles, unsigned numTriangles, int vertex)
           /*
           printf("Found (%i,%i,%i) to swap with (%i,%i,%i)\n",pTriangles[j][0],pTriangles[j][1],pTriangles[j][2],pTriangles[i+1][0],pTriangles[i+1][1],pTriangles[i+1][2]);
           */
+          count++;
           temp = pTriangles[i+1];
           pTriangles[i+1] = pTriangles[j];
           pTriangles[j] = temp;
@@ -607,6 +614,12 @@ static void sortByVertex(int** pTriangles, unsigned numTriangles, int vertex)
       }
     }
   }
+  if (count==numTriangles-1)
+  {
+    if (shareCommonEdge(pTriangles[0],pTriangles[numTriangles-1]))
+      return 1;
+  }
+  return 0;
 }
 
 static double voronoiArea(Point* pArray, int** pTriangles, unsigned numTriangles, int vertex)
@@ -616,8 +629,7 @@ static double voronoiArea(Point* pArray, int** pTriangles, unsigned numTriangles
   double sum,sqRadius;
   if (numTriangles<3)
     return -1.0;
-  sortByVertex(pTriangles,numTriangles,vertex);
-  if (shareCommonEdge(pTriangles[0],pTriangles[numTriangles-1])==0)
+  if (sortByVertex(pTriangles,numTriangles,vertex)==0)
     return -1.0;
 
   for (sum=0,i=1;i<numTriangles;i++)
@@ -642,6 +654,37 @@ static double voronoiArea(Point* pArray, int** pTriangles, unsigned numTriangles
   c2 = getCircumcenter(b1,b2,b3,&sqRadius);
   sum += getTriangleArea(c1,c2,pArray[vertex]);
   return sum;
+}
+
+void voronoi_areas(Point p[], unsigned n, double areas[])
+{
+  int i;
+  unsigned numTriangles, numVertexTriangles;
+  int ** pTriangles, **pVertexTriangles;
+  if (n<0)
+    return;
+  if (n<4)
+  {
+    for (i=0;i<n;i++)
+    {
+      areas[i]=-1.0;
+    }
+    return;
+  }
+  pTriangles = getDelaunayTriangles(p,n,&numTriangles);
+  if (pTriangles==NULL)
+  {
+    for (i=0;i<n;i++)
+    {
+      areas[i]=-1.0;
+    }
+    return;
+  }
+  for (i=0;i<n;i++)
+  {
+    pVertexTriangles = getTrianglesByVertex(pTriangles,numTriangles,i,&numVertexTriangles);
+    areas[i]=voronoiArea(p,pVertexTriangles,numVertexTriangles,i);
+  }
 }
 
 int main(int argc, char* argv[])
