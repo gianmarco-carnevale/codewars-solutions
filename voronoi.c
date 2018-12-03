@@ -324,22 +324,21 @@ static int redundant(Point a1, Point a2, Point a3, Point b1, Point b2, Point b3)
         {
           if ((samePoint(first[i],second[k])==1) && (samePoint(first[j],second[l])==1))
           {
-            printf("Common edge: (%f,%f)-(%f,%f)\n",first[i].x,first[i].y,first[j].x,first[j].y);
+
             t1 = getThirdVertex(i,j);
             t2 = getThirdVertex(k,l);
             third1 = first[t1];
             third2 = second[t2];
-            printf("Other vertex: (%f,%f)\n",third1.x,third1.y);
-            printf("Other vertex: (%f,%f)\n",third2.x,third2.y);
+
             edge = getStraightLine(first[i],first[j]);
             if (areParted(third1,third2,edge))
             {
-              printf("Parted, no cancellation\n");
+
               return 0;
             }
             else
             {
-              printf("On the same side, cancel\n");
+
               return 1;
             }
           }
@@ -684,7 +683,14 @@ void voronoi_areas(Point p[], unsigned n, double areas[])
   {
     pVertexTriangles = getTrianglesByVertex(pTriangles,numTriangles,i,&numVertexTriangles);
     areas[i]=voronoiArea(p,pVertexTriangles,numVertexTriangles,i);
+    free(pVertexTriangles);
   }
+  for (i=0;i<numTriangles;i++)
+  {
+    if (pTriangles[i])
+      free(pTriangles[i]);
+  }
+  free(pTriangles);
 }
 
 int main(int argc, char* argv[])
@@ -696,38 +702,18 @@ int main(int argc, char* argv[])
   double r;
 
   Point a1,a2,a3,b1,b2,b3;
-  Point array[] = {
+  Point pointArray[] = {
   {0.0, 0.0}, {2.0, 0.0}, {-2.0, 0.0}, {0.0, 2.0}, {0.0, -2.0}
   };
-  Npoints = sizeof(array)/sizeof(Point);
+  double areaArray[] = {0.0,0.0,0.0,0.0,0.0};
+  Npoints = sizeof(pointArray)/sizeof(Point);
 
-  pTriangles = getDelaunayTriangles(array,Npoints,&numTriangles);
-  if (pTriangles)
+  voronoi_areas(pointArray,Npoints,areaArray);
+  for (i=0;i<Npoints;i++)
   {
-
-    printf("Got %d triangles\n",numTriangles);
-    for (i=0;i<numTriangles;i++)
-    {
-      printf("(%f,%f)-",array[pTriangles[i][0]].x,array[pTriangles[i][0]].y);
-      printf("(%f,%f)-",array[pTriangles[i][1]].x,array[pTriangles[i][1]].y);
-      printf("(%f,%f)\n",array[pTriangles[i][2]].x,array[pTriangles[i][2]].y);
-    }
-#if 1
-    for (i=0;i<Npoints;i++)
-    {
-      pVertexTriangles = getTrianglesByVertex(pTriangles,numTriangles,i,&numVertexTriangles);
-      printf("--------------------------------------------------\n");
-
-      printf("Vertex %i: ",i);
-      for (j=0;j<numVertexTriangles;j++)
-      {
-        printf("%i,%i,%i - ",pVertexTriangles[j][0],pVertexTriangles[j][1],pVertexTriangles[j][2]);
-      }
-      printf(", Voronoi area: %f\n",voronoiArea(array,pVertexTriangles,numVertexTriangles,i));
-    }
-#endif
+    printf("%f,",areaArray[i]);
   }
-
+  printf("\n");
 
   return 0;
 }
