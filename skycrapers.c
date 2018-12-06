@@ -46,11 +46,16 @@ static int getRandomValue()
   return randomData[offset];
 }
 
+
+
+
+
 static void generateRandomRow(int row[SQUARE_SIZE])
 {
   int i;
   int length;
   int selection;
+  int r;
   int v[SQUARE_SIZE];
   for (i=0;i<SQUARE_SIZE;i++)
   {
@@ -71,17 +76,40 @@ static void generateRandomRow(int row[SQUARE_SIZE])
   }
 }
 
+static void crossOut(int freedom[SQUARE_SIZE][SQUARE_SIZE],int column)
+{
+  int i;
+  for (i=0;i<SQUARE_SIZE;i++)
+    freedom[i][column]=0;
+}
 
 static void generateSquare(int s[SQUARE_SIZE][SQUARE_SIZE])
 {
-  int i,j,k;
+  int i,j,k,value;
   int freedom[SQUARE_SIZE][SQUARE_SIZE];
+  int tempRow[SQUARE_SIZE];
   for (i=0;i<SQUARE_SIZE;i++)
   {
     for (j=0;j<SQUARE_SIZE;j++)
     {
       freedom[i][j]=1;
     }
+  }
+  for (i=0;i<SQUARE_SIZE;i++)
+  {
+    generateRandomRow(tempRow);
+    for (j=0;i<SQUARE_SIZE;j++)
+    {
+      value = tempRow[j];
+      for (k=0;k<SQUARE_SIZE;k++)
+      {
+        if (freedom[i][value-1])
+        {
+          crossOut(freedom,);
+        }
+      }
+    }
+
   }
 
 
