@@ -3,21 +3,16 @@
 #include <string.h>
 
 #if 0
-#!/usr/bin/sh
 .PHONY: all run_main
 all: run_main
-
-RANDOM_STRING=`date|sha512sum.exe`
 
 skycrapers.out: skycrapers.c
 	rm -f skycrapers.out
 	gcc skycrapers.c -o skycrapers.out
 
 run_main: skycrapers.out
-	./skycrapers.out $(RANDOM_STRING)
+	./skycrapers.out `date|sha512sum.exe`
 #endif
-
-
 
 /*----------------------------------------------*/
 #define MASK_WIDTH  3
@@ -35,14 +30,14 @@ static void fillRandomData(int* p, char* hash)
   for (i=0;i<RANDOM_LENGTH;i++)
   {
     memcpy(temp,&hash[8*i],8);
-		/*
     p[i]=strtol(temp,NULL,16);
+		/*
     printf("%08X\n",p[i]);
 		*/
   }
-	/*
+/*
   printf("%s\n",hash);
-	*/
+*/
 }
 
 static int getRandomValue()
