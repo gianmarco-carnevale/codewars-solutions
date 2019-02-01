@@ -15,10 +15,15 @@ run_main: skycrapers.out
 #endif
 
 /*----------------------------------------------*/
-#define MASK_WIDTH  3
-#define HEIGHT_MASK (~(0xFFFFFFFF << MASK_WIDTH))
 #define SQUARE_SIZE 7
+/*----------------------------------------------*/
+#define MASK_WIDTH  3
+#define HEIGHT_MASK ((1<<MASK_WIDTH)-1)
 #define NUM_SHUFFLES_MASK 0x7F
+#define OPERATION_MASK 0x2
+#if SQUARE_SIZE>HEIGHT_MASK
+#error SQUARE_SIZE exceeds HEIGHT_MASK
+#endif
 /*----------------------------------------------*/
 #define RANDOM_LENGTH 16
 static int randomData[RANDOM_LENGTH];
@@ -48,6 +53,35 @@ static int getRandomValue()
 	if (offset<0)
 		offset = -offset;
   return randomData[offset];
+}
+
+static void swapValues(int square[SQUARE_SIZE][SQUARE_SIZE], int val1, int val2)
+{
+	int i,j;
+	if (val1>=SQUARE_SIZE)
+		return;
+	if (val2>=SQUARE_SIZE)
+		return;
+	if (val1<0)
+		return;
+	if (val2<0)
+		return;
+	val1++;
+	val2++;
+	for (i=0;i<SQUARE_SIZE;i++)
+	{
+		for (j=0;j<SQUARE_SIZE;j++)
+		{
+			if (square[i][j]==val1)
+			{
+				square[i][j]=val2;
+			}
+			else if (square[i][j]==val2)
+			{
+				square[i][j]=val1;
+			}
+		}
+	}
 }
 
 static void swapColumns(int square[SQUARE_SIZE][SQUARE_SIZE], int col1, int col2)
@@ -98,8 +132,20 @@ static void singleShuffle(int square[SQUARE_SIZE][SQUARE_SIZE])
 	{
 		index1 = (index1 + getRandomValue()) % SQUARE_SIZE;
 	}
-	operation = (operation >> 8) & 0x1;
+	operation = (operation >> (2*MASK_WIDTH)) & OPERATION_MASK;
 
+	switch (operation)
+	{
+		case 0:
+			swapColumns(square,index1,index2);
+		break;
+		case 1:
+			swapRows(square,index1,index2);
+		break;
+		default:
+			swapValues(square,index1,index2);
+		break;
+	}
 	if (operation)
 		swapColumns(square,index1,index2);
 	else
@@ -255,15 +301,75 @@ static void printSquare(int square[SQUARE_SIZE][SQUARE_SIZE])
 	printf("\n");
 }
 
+typedef int (*CountFunctionType)(int[SQUARE_SIZE][SQUARE_SIZE],int);
+
+static void decreaseViewFromNorth(int square[SQUARE_SIZE][SQUARE_SIZE], int column)
+{
+	int i,last,count;
+	int temp[SQUARE_SIZE];
+	for (i=0;i<SQUARE_SIZE;i++)
+	{
+		temp[i]=square[i][column];
+	}
+
+
+}
+
+static int* getShuffleList(int array[SQUARE_SIZE], int reqCount, int *pNumShuffles)
+{
+	int i,count,last;
+	for (count=0,last=-1,i=0;i<SQUARE_SIZE;i++)
+	{
+		if (array[i]>last)
+		{
+			last = array[i];
+			count++;
+		}
+	}
+	if (count == reqCount)
+	{
+		if (pNumShuffles)
+			*pNumShuffles=0;
+		return NULL;
+	}
+	
+
+}
+
+static int shuffleByRequirement(int square[SQUARE_SIZE][SQUARE_SIZE], int viewPoint, int index, int reqCount)
+{
+	int count;
+	static CountFunctionType fn[4]={countFromNorth,countFromEast,countFromSouth,countFromWest};
+	if (viewPoint<0)
+		return -1;
+	if (viewPoint>3)
+		return -1;
+	if (index<0)
+		return -1;
+	if (index>=SQUARE_SIZE)
+		return -1;
+	if (reqCount<1)
+		return -1;
+	if (reqCount>SQUARE_SIZE)
+		return -1;
+	count = fn[viewPoint](square,index);
+	if (count == reqCount)
+		return 1;
+	if (count>reqCount)
+	{
+
+	}
+	else
+	{
+
+	}
+	return 0;
+}
+
+
 int main(int argc, char* argv[])
 {
 	int s[SQUARE_SIZE][SQUARE_SIZE];
-	if (SQUARE_SIZE>HEIGHT_MASK)
-	{
-		printf("ERROR: SQUARE_SIZE exceeds HEIGHT_MASK, rebuild the application.\n");
-		return -1;
-	}
-
   if (argc>1)
     fillRandomData(randomData,argv[1]);
   else
