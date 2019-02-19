@@ -303,38 +303,205 @@ static void printSquare(int square[SQUARE_SIZE][SQUARE_SIZE])
 
 typedef int (*CountFunctionType)(int[SQUARE_SIZE][SQUARE_SIZE],int);
 
-static void decreaseViewFromNorth(int square[SQUARE_SIZE][SQUARE_SIZE], int column)
+
+static int getCount(const int array[SQUARE_SIZE], int visible[SQUARE_SIZE])
 {
-	int i,last,count;
-	int temp[SQUARE_SIZE];
-	for (i=0;i<SQUARE_SIZE;i++)
+	int i, count, largest;
+	for (i=0,count=0,largest=-1;i<SQUARE_SIZE;i++)
 	{
-		temp[i]=square[i][column];
-	}
-
-
-}
-
-static int* getShuffleList(int array[SQUARE_SIZE], int reqCount, int *pNumShuffles)
-{
-	int i,count,last;
-	for (count=0,last=-1,i=0;i<SQUARE_SIZE;i++)
-	{
-		if (array[i]>last)
+		if (array[i]>largest)
 		{
-			last = array[i];
+			largest = array[i];
+			if (visible!=NULL)
+				visible[i] = 1;
 			count++;
 		}
+		else
+		{
+			if (visible!=NULL)
+				visible[i] = 0;
+		}
 	}
-	if (count == reqCount)
-	{
-		if (pNumShuffles)
-			*pNumShuffles=0;
-		return NULL;
-	}
-	
-
+	return count;
 }
+
+static int* addShuffle(int* pShuffleList, int newLength, int index1, int index2)
+{
+	if (pShuffleList==NULL)
+	{
+		if (newLength!=1)
+		{
+			printf("ERROR: invalid length\n");
+			return NULL;
+		}
+		pShuffleList = (int*)malloc(2*sizeof(int));
+		if (pShuffleList==NULL)
+		{
+			printf("ERROR: malloc failed in addShuffle\n");
+			return NULL;
+		}
+		pShuffleList[0]=index1;
+		pShuffleList[1]=index2;
+	}
+	else
+	{
+		if (newLength<2)
+		{
+			printf("ERROR: invalid length (2)\n");
+			return NULL;
+		}
+		pShuffleList = (int*)realloc(pShuffleList,newLength*2*sizeof(int));
+		if (pShuffleList==NULL)
+		{
+			printf("ERROR: realloc failed in addShuffle\n");
+			return NULL;
+		}
+		pShuffleList[(newLength-1)*2]=index1;
+		pShuffleList[(newLength-1)*2+1]=index2;
+	}
+	return pShuffleList;
+}
+
+
+static int increaseCount(int array[SQUARE_SIZE], int reqCount)
+{
+	int i,j,temp,count;
+	int attempt[SQUARE_SIZE];
+	int visible[SQUARE_SIZE];
+	int swapIndex1, swapIndex2, maxCount;
+	maxCount=-1;
+
+	count = getCount(array,visible);
+	for (i=0;i<SQUARE_SIZE;++i)
+	{
+		for (j=i+1;j<SQUARE_SIZE;++j)
+		{
+			if (visible[i] || visible[j])
+			{
+				memcpy(&attempt[0],&array[0],SQUARE_SIZE*sizeof(int));
+				temp = attempt[i];
+				attempt[i] = attempt[j];
+				attempt[j] = temp;
+				temp = getCount(attempt,NULL);
+				if (temp == reqCount)
+				{
+					printf("swapping positions %i and %i\n",i,j);
+					printf("Finished\n");
+					temp = array[i];
+					array[i] = array[j];
+					array[j] = temp;
+					return 0;
+				}
+
+				if (temp > reqCount)
+				{
+					printf("too high\n");
+					continue;
+				}
+				else
+				{
+					if (temp>maxCount)
+					{
+						printf("found %i\n",temp);
+						maxCount = temp;
+						swapIndex1 = i;
+						swapIndex2 = j;
+					}
+				}
+			}
+		}
+	}
+	printf("swapping positions %i and %i\n",swapIndex1,swapIndex2);
+	temp = array[swapIndex1];
+	array[swapIndex1] = array[swapIndex2];
+	array[swapIndex2] = temp;
+
+	return 1;
+}
+
+static int decreaseCount(int array[SQUARE_SIZE], int reqCount)
+{
+	int i,j,temp, count;
+	int attempt[SQUARE_SIZE];
+	int visible[SQUARE_SIZE];
+	int swapIndex1, swapIndex2, minCount;
+	minCount=SQUARE_SIZE+1;
+
+	count = getCount(array,visible);
+	for (i=0;i<SQUARE_SIZE;++i)
+	{
+		for (j=i+1;j<SQUARE_SIZE;++j)
+		{
+			if (visible[i] || visible[j])
+			{
+				memcpy(&attempt[0],&array[0],SQUARE_SIZE*sizeof(int));
+				temp = attempt[i];
+				attempt[i] = attempt[j];
+				attempt[j] = temp;
+				temp = getCount(attempt,NULL);
+				if (temp == reqCount)
+				{
+					printf("swapping positions %i and %i\n",i,j);
+					printf("Finished\n");
+					temp = array[i];
+					array[i] = array[j];
+					array[j] = temp;
+					return 0;
+				}
+				if (temp < reqCount)
+				{
+					printf("too low\n");
+					continue;
+				}
+				else
+				{
+					if (temp < minCount)
+					{
+						minCount = temp;
+						swapIndex1 = i;
+						swapIndex2 = j;
+					}
+				}
+			}
+		}
+	}
+	printf("swapping positions %i and %i\n",swapIndex1,swapIndex2);
+	temp = array[swapIndex1];
+	array[swapIndex1] = array[swapIndex2];
+	array[swapIndex2] = temp;
+	return 1;
+}
+
+static void getShuffleList(const int array[SQUARE_SIZE], int reqCount)
+{
+	int i,j, count, last, temp, numShuffles, delta, topPosition, bestMin, bestMax;
+	int i1, i2;
+	int visible[SQUARE_SIZE];
+	int copy[SQUARE_SIZE];
+	int attempt[SQUARE_SIZE];
+	int* result;
+	int goingUp;
+	int iterations;
+	memcpy(&copy[0],&array[0],SQUARE_SIZE*sizeof(int));
+	for (iterations=0;iterations<SQUARE_SIZE+1;iterations++)
+	{
+		count = getCount(copy,visible);
+		if (count == reqCount)
+		{
+			printf("good\n");
+			return;
+		}
+		goingUp = (count<reqCount)?1:0;
+
+		if (goingUp)
+			temp = increaseCount(copy,reqCount);
+		else
+			temp = decreaseCount(copy,reqCount);
+
+
+	} /* main loop */
+}
+
 
 static int shuffleByRequirement(int square[SQUARE_SIZE][SQUARE_SIZE], int viewPoint, int index, int reqCount)
 {
@@ -369,7 +536,11 @@ static int shuffleByRequirement(int square[SQUARE_SIZE][SQUARE_SIZE], int viewPo
 
 int main(int argc, char* argv[])
 {
+	int i;
 	int s[SQUARE_SIZE][SQUARE_SIZE];
+	int line[SQUARE_SIZE]    = {2,5,1,7,3,4,6};
+	int smaller[SQUARE_SIZE] = {0,0,0,0,0,0,0};
+	int visible[SQUARE_SIZE]  = {0,0,0,0,0,0,0};
   if (argc>1)
     fillRandomData(randomData,argv[1]);
   else
@@ -377,5 +548,19 @@ int main(int argc, char* argv[])
 
 	generateSquare(s);
 	printSquare(s);
+
+	printf("Count==%i\n",getCount(line,visible));
+	printf("line    == ");
+	for (i=0;i<SQUARE_SIZE;i++)
+	{
+		printf("%i ",line[i]);
+	}
+	printf("\nvisible == ");
+	for (i=0;i<SQUARE_SIZE;i++)
+	{
+		printf("%i ",visible[i]);
+	}
+	printf("\n");
+	getShuffleList(line,5);
   return 0;
 }
