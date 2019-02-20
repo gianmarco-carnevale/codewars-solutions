@@ -301,30 +301,6 @@ static void printSquare(int square[SQUARE_SIZE][SQUARE_SIZE])
 	printf("\n");
 }
 
-typedef int (*CountFunctionType)(int[SQUARE_SIZE][SQUARE_SIZE],int);
-
-
-static int getCount(const int array[SQUARE_SIZE], int visible[SQUARE_SIZE])
-{
-	int i, count, largest;
-	for (i=0,count=0,largest=-1;i<SQUARE_SIZE;i++)
-	{
-		if (array[i]>largest)
-		{
-			largest = array[i];
-			if (visible!=NULL)
-				visible[i] = 1;
-			count++;
-		}
-		else
-		{
-			if (visible!=NULL)
-				visible[i] = 0;
-		}
-	}
-	return count;
-}
-
 static int* addShuffle(int* pShuffleList, int newLength, int index1, int index2)
 {
 	if (pShuffleList==NULL)
@@ -362,16 +338,43 @@ static int* addShuffle(int* pShuffleList, int newLength, int index1, int index2)
 	return pShuffleList;
 }
 
+typedef int (*CountFunctionType)(int[SQUARE_SIZE][SQUARE_SIZE],int);
+
+
+static int getCount(const int array[SQUARE_SIZE], int visible[SQUARE_SIZE])
+{
+	int i, count, largest;
+	for (i=0,count=0,largest=-1;i<SQUARE_SIZE;i++)
+	{
+		if (array[i]>largest)
+		{
+			largest = array[i];
+			if (visible!=NULL)
+				visible[i] = 1;
+			count++;
+		}
+		else
+		{
+			if (visible!=NULL)
+				visible[i] = 0;
+		}
+	}
+	return count;
+}
 
 static int increaseCount(int array[SQUARE_SIZE], int reqCount)
 {
 	int i,j,temp,count;
 	int attempt[SQUARE_SIZE];
 	int visible[SQUARE_SIZE];
-	int swapIndex1, swapIndex2, maxCount;
+	int swapIndex1, swapIndex2, swapIndex3, swapIndex4, maxCount;
+	swapIndex1=-1;
+	swapIndex2=-1;
+	swapIndex3=-1;
+	swapIndex4=-1;
 	maxCount=-1;
-
 	count = getCount(array,visible);
+
 	for (i=0;i<SQUARE_SIZE;++i)
 	{
 		for (j=i+1;j<SQUARE_SIZE;++j)
@@ -379,44 +382,75 @@ static int increaseCount(int array[SQUARE_SIZE], int reqCount)
 			if (visible[i] || visible[j])
 			{
 				memcpy(&attempt[0],&array[0],SQUARE_SIZE*sizeof(int));
+
 				temp = attempt[i];
 				attempt[i] = attempt[j];
 				attempt[j] = temp;
+
 				temp = getCount(attempt,NULL);
+
 				if (temp == reqCount)
 				{
-					printf("swapping positions %i and %i\n",i,j);
-					printf("Finished\n");
 					temp = array[i];
 					array[i] = array[j];
 					array[j] = temp;
+					printf("swapping %i and %i, done\n",i,j);
 					return 0;
 				}
 
-				if (temp > reqCount)
+				if (temp > count)
 				{
-					printf("too high\n");
-					continue;
-				}
-				else
-				{
-					if (temp>maxCount)
+					if (temp > reqCount)
 					{
-						printf("found %i\n",temp);
-						maxCount = temp;
-						swapIndex1 = i;
-						swapIndex2 = j;
+						printf("Too high!!!\n");
+						continue;
+					}
+					else
+					{
+						if (temp > maxCount)
+						{
+							maxCount = temp;
+							swapIndex1 = i;
+							swapIndex2 = j;
+							continue;
+						}
+					}
+				}
+				if (temp == count)
+				{
+					if ((swapIndex3<0) || (swapIndex4<0))
+					{
+						if (visible[i])
+						{
+							if (array[i]>array[j])
+							{
+								swapIndex3 = i;
+								swapIndex4 = j;
+								continue;
+							}
+						}
 					}
 				}
 			}
 		}
 	}
-	printf("swapping positions %i and %i\n",swapIndex1,swapIndex2);
-	temp = array[swapIndex1];
-	array[swapIndex1] = array[swapIndex2];
-	array[swapIndex2] = temp;
-
-	return 1;
+	if ((swapIndex1>=0) || (swapIndex2>=0))
+	{
+		temp = array[swapIndex1];
+		array[swapIndex1] = array[swapIndex2];
+		array[swapIndex2] = temp;
+		printf("swapping %i and %i, count increased but not done yet\n",swapIndex1,swapIndex2);
+		return 1;
+	}
+	if ((swapIndex3>=0) || (swapIndex4>=0))
+	{
+		temp = array[swapIndex3];
+		array[swapIndex3] = array[swapIndex4];
+		array[swapIndex4] = temp;
+		printf("swapping %i and %i, count still the same\n",swapIndex3,swapIndex4);
+		return 2;
+	}
+	return -1;
 }
 
 static int decreaseCount(int array[SQUARE_SIZE], int reqCount)
@@ -483,9 +517,10 @@ static void getShuffleList(const int array[SQUARE_SIZE], int reqCount)
 	int goingUp;
 	int iterations;
 	memcpy(&copy[0],&array[0],SQUARE_SIZE*sizeof(int));
-	for (iterations=0;iterations<SQUARE_SIZE+1;iterations++)
+	for (iterations=0;iterations<3*SQUARE_SIZE;iterations++)
 	{
-		count = getCount(copy,visible);
+		count = getCount(copy,NULL);
+
 		if (count == reqCount)
 		{
 			printf("good\n");
@@ -497,7 +532,6 @@ static void getShuffleList(const int array[SQUARE_SIZE], int reqCount)
 			temp = increaseCount(copy,reqCount);
 		else
 			temp = decreaseCount(copy,reqCount);
-
 
 	} /* main loop */
 }
@@ -538,7 +572,7 @@ int main(int argc, char* argv[])
 {
 	int i;
 	int s[SQUARE_SIZE][SQUARE_SIZE];
-	int line[SQUARE_SIZE]    = {2,5,1,7,3,4,6};
+	int line[SQUARE_SIZE]    = {7,6,5,4,3,2,1};
 	int smaller[SQUARE_SIZE] = {0,0,0,0,0,0,0};
 	int visible[SQUARE_SIZE]  = {0,0,0,0,0,0,0};
   if (argc>1)
@@ -561,6 +595,6 @@ int main(int argc, char* argv[])
 		printf("%i ",visible[i]);
 	}
 	printf("\n");
-	getShuffleList(line,5);
+	getShuffleList(line,7);
   return 0;
 }
