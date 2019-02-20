@@ -176,90 +176,155 @@ static void generateSquare(int square[SQUARE_SIZE][SQUARE_SIZE])
 	}
 }
 
-
-static int commonValue(int* a, int* b)
+typedef enum
 {
-  int i;
-  for (i=0;i<SQUARE_SIZE;i++)
-  {
-    if (a[i]==b[i])
-      return 1;
-  }
-  return 0;
+	eFromNorth,
+	eFromEast,
+	eFromSouth,
+	eFromWest
+} PointOfView;
+
+static int getViewCount(int s[SQUARE_SIZE][SQUARE_SIZE], PointOfView view, int index)
+{
+	int i,last,count,value,loopForward,firstBracket;
+	if (index<0)
+		return 0;
+	if (index>=SQUARE_SIZE)
+		return 0;
+	switch (view)
+	{
+		case eFromNorth:
+			loopForward = 1;
+			firstBracket = 0;
+		break;
+		case eFromEast:
+			loopForward = 0;
+			firstBracket = 1;
+		break;
+		case eFromSouth:
+			loopForward = 0;
+			firstBracket = 0;
+		break;
+		case eFromWest:
+			loopForward = 1;
+			firstBracket = 1;
+		break;
+		default:
+		{
+			printf("ERROR: invalid point of view %i\n",view);
+			return -1;
+		}
+	}
+	if (loopForward)
+	{
+		for (count=0,last=-1,i=0;i<SQUARE_SIZE;i++)
+		{
+			value = (firstBracket)?s[index][i]:s[i][index];
+			if (value>last)
+			{
+				last = value;
+				count++;
+			}
+		}
+	}
+	else
+	{
+		for (count=0,last=-1,i=SQUARE_SIZE-1;i>=0;i--)
+		{
+			value = (firstBracket)?s[index][i]:s[i][index];
+			if (value>last)
+			{
+				last = value;
+				count++;
+			}
+		}
+	}
+	return count;
 }
 
-
-static int countFromEast(int s[SQUARE_SIZE][SQUARE_SIZE],int row)
+static void swapByView(int square[SQUARE_SIZE][SQUARE_SIZE], PointOfView view, int index1, int index2)
 {
-  int i,last,count;
-  if (row<0)
-    return 0;
-  if (row>=SQUARE_SIZE)
-    return 0;
-  for (count=0,last=-1,i=SQUARE_SIZE-1;i>=0;i--)
-  {
-    if (s[row][i]>last)
-    {
-      last=s[row][i];
-      count++;
-    }
-  }
-  return count;
+	if (index1>=SQUARE_SIZE)
+		return;
+	if (index2>=SQUARE_SIZE)
+		return;
+	if (index1<0)
+		return;
+	if (index2<0)
+		return;
+	switch (view)
+	{
+		case eFromNorth:
+			swapRows(square,index1,index2);
+		break;
+		case eFromEast:
+			index1 = SQUARE_SIZE - 1 - index1;
+			index2 = SQUARE_SIZE - 1 - index2;
+			swapColumns(square,index1,index2);
+		break;
+		case eFromSouth:
+			index1 = SQUARE_SIZE - 1 - index1;
+			index2 = SQUARE_SIZE - 1 - index2;
+			swapRows(square,index1,index2);
+		break;
+		case eFromWest:
+			swapColumns(square,index1,index2);
+		break;
+		default:
+		{
+			printf("ERROR: invalid view %i\n",view);
+			return;
+		}
+	}
 }
 
-static int countFromWest(int s[SQUARE_SIZE][SQUARE_SIZE],int row)
+static void getArrayFromSquare(int square[SQUARE_SIZE][SQUARE_SIZE], PointOfView view, int index, int array[SQUARE_SIZE])
 {
-  int i,last,count;
-  if (row<0)
-    return 0;
-  if (row>=SQUARE_SIZE)
-    return 0;
-  for (count=0,last=-1,i=0;i<SQUARE_SIZE;i++)
-  {
-    if (s[row][i]>last)
-    {
-      last=s[row][i];
-      count++;
-    }
-  }
-  return count;
+	int i,last,count,value,loopForward,firstBracket;
+	if (index>=SQUARE_SIZE)
+		return;
+	if (index>=SQUARE_SIZE)
+		return;
+	switch (view)
+	{
+		case eFromNorth:
+			loopForward = 1;
+			firstBracket = 0;
+		break;
+		case eFromEast:
+			loopForward = 0;
+			firstBracket = 1;
+		break;
+		case eFromSouth:
+			loopForward = 0;
+			firstBracket = 0;
+		break;
+		case eFromWest:
+			loopForward = 1;
+			firstBracket = 1;
+		break;
+		default:
+		{
+			printf("ERROR: invalid view %i\n",view);
+			return;
+		}
+	}
+	if (loopForward)
+	{
+		for (i=0;i<SQUARE_SIZE;i++)
+		{
+			array[i] = (firstBracket)?square[index][i]:square[i][index];
+		}
+	}
+	else
+	{
+		for (i=SQUARE_SIZE-1;i>=0;i--)
+		{
+			array[SQUARE_SIZE-1-i] = (firstBracket)?square[index][i]:square[i][index];
+		}
+	}
 }
 
-static int countFromNorth(int s[SQUARE_SIZE][SQUARE_SIZE],int column)
-{
-  int i,last,count;
-  if (column<0)
-    return 0;
-  if (column>=SQUARE_SIZE)
-    return 0;
-  for (count=0,last=-1,i=0;i<SQUARE_SIZE;i++)
-  {
-    if (s[i][column]>last)
-    {
-      last=s[i][column];
-      count++;
-    }
-  }
-  return count;
-}
-
-static int countFromSouth(int s[SQUARE_SIZE][SQUARE_SIZE],int column)
-{
-  int i,last,count;
-  if (column<0)
-    return 0;
-  if (column>=SQUARE_SIZE)
-    return 0;
-  for (count=0,last=-1,i=SQUARE_SIZE-1;i>=0;i--)
-  {
-    if (s[i][column]>last)
-    {
-      last=s[i][column];
-      count++;
-    }
-  }
-  return count;
-}
 
 static void printSquare(int square[SQUARE_SIZE][SQUARE_SIZE])
 {
@@ -267,7 +332,7 @@ static void printSquare(int square[SQUARE_SIZE][SQUARE_SIZE])
 	printf("\n     ");
   for (j=0;j<SQUARE_SIZE;j++)
   {
-    printf("%i ",countFromNorth(square,j));
+    printf("%i ",getViewCount(square,eFromNorth,j));
   }
 	printf("\n     ");
 	for (j=0;j<SQUARE_SIZE;j++)
@@ -279,12 +344,12 @@ static void printSquare(int square[SQUARE_SIZE][SQUARE_SIZE])
   printf("\n");
   for (i=0;i<SQUARE_SIZE;i++)
   {
-    printf(" %i | ",countFromWest(square,i));
+    printf(" %i | ",getViewCount(square,eFromWest,i));
     for (j=0;j<SQUARE_SIZE;j++)
     {
       printf("%i ",square[i][j]);
     }
-		printf("| %i\n",countFromEast(square,i));
+		printf("| %i\n",getViewCount(square,eFromEast,i));
   }
 	printf("     ");
 	for (j=0;j<SQUARE_SIZE;j++)
@@ -296,10 +361,18 @@ static void printSquare(int square[SQUARE_SIZE][SQUARE_SIZE])
 	printf("\n     ");
   for (j=0;j<SQUARE_SIZE;j++)
   {
-    printf("%i ",countFromSouth(square,j));
+    printf("%i ",getViewCount(square,eFromSouth,j));
   }
 	printf("\n");
 }
+
+struct Shuffle
+{
+	PointOfView view;
+	int pos1;
+	int pos2;
+	struct Shuffle* next;
+};
 
 static int* addShuffle(int* pShuffleList, int newLength, int index1, int index2)
 {
@@ -338,7 +411,6 @@ static int* addShuffle(int* pShuffleList, int newLength, int index1, int index2)
 	return pShuffleList;
 }
 
-typedef int (*CountFunctionType)(int[SQUARE_SIZE][SQUARE_SIZE],int);
 
 
 static int getCount(const int array[SQUARE_SIZE], int visible[SQUARE_SIZE])
@@ -537,34 +609,12 @@ static void getShuffleList(const int array[SQUARE_SIZE], int reqCount)
 }
 
 
-static int shuffleByRequirement(int square[SQUARE_SIZE][SQUARE_SIZE], int viewPoint, int index, int reqCount)
+static int shuffleByRequirement(int square[SQUARE_SIZE][SQUARE_SIZE], PointOfView view, int index, int reqCount)
 {
-	int count;
-	static CountFunctionType fn[4]={countFromNorth,countFromEast,countFromSouth,countFromWest};
-	if (viewPoint<0)
-		return -1;
-	if (viewPoint>3)
-		return -1;
-	if (index<0)
-		return -1;
-	if (index>=SQUARE_SIZE)
-		return -1;
-	if (reqCount<1)
-		return -1;
-	if (reqCount>SQUARE_SIZE)
-		return -1;
-	count = fn[viewPoint](square,index);
-	if (count == reqCount)
-		return 1;
-	if (count>reqCount)
-	{
+	int array[SQUARE_SIZE];
+	getArrayFromSquare(square,view,index,array);
+	getShuffleList(array,reqCount);
 
-	}
-	else
-	{
-
-	}
-	return 0;
 }
 
 
@@ -572,9 +622,9 @@ int main(int argc, char* argv[])
 {
 	int i;
 	int s[SQUARE_SIZE][SQUARE_SIZE];
-	int line[SQUARE_SIZE]    = {7,6,5,4,3,2,1};
+	int line[SQUARE_SIZE]    = {5,1,4,2,7,6,3};
 	int smaller[SQUARE_SIZE] = {0,0,0,0,0,0,0};
-	int visible[SQUARE_SIZE]  = {0,0,0,0,0,0,0};
+	int visible[SQUARE_SIZE] = {0,0,0,0,0,0,0};
   if (argc>1)
     fillRandomData(randomData,argv[1]);
   else
@@ -595,6 +645,6 @@ int main(int argc, char* argv[])
 		printf("%i ",visible[i]);
 	}
 	printf("\n");
-	getShuffleList(line,7);
+	getShuffleList(line,3);
   return 0;
 }
