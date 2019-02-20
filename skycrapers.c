@@ -368,50 +368,32 @@ static void printSquare(int square[SQUARE_SIZE][SQUARE_SIZE])
 
 struct Shuffle
 {
-	PointOfView view;
+	PointOfView pov;
 	int pos1;
 	int pos2;
 	struct Shuffle* next;
 };
 
-static int* addShuffle(int* pShuffleList, int newLength, int index1, int index2)
+static struct Shuffle* addShuffle(struct Shuffle* pShuffleList, PointOfView view, int index1, int index2)
 {
+	struct Shuffle* last , *temp;
+	last = (struct Shuffle*)malloc(sizeof(struct Shuffle));
+	if (last==NULL)
+	{
+		printf("ERROR: malloc failed in addShuffle\n");
+		return NULL;
+	}
+	last->pov  = view;
+	last->pos1 = index1;
+	last->pos2 = index2;
+	last->next = NULL;
 	if (pShuffleList==NULL)
-	{
-		if (newLength!=1)
-		{
-			printf("ERROR: invalid length\n");
-			return NULL;
-		}
-		pShuffleList = (int*)malloc(2*sizeof(int));
-		if (pShuffleList==NULL)
-		{
-			printf("ERROR: malloc failed in addShuffle\n");
-			return NULL;
-		}
-		pShuffleList[0]=index1;
-		pShuffleList[1]=index2;
-	}
-	else
-	{
-		if (newLength<2)
-		{
-			printf("ERROR: invalid length (2)\n");
-			return NULL;
-		}
-		pShuffleList = (int*)realloc(pShuffleList,newLength*2*sizeof(int));
-		if (pShuffleList==NULL)
-		{
-			printf("ERROR: realloc failed in addShuffle\n");
-			return NULL;
-		}
-		pShuffleList[(newLength-1)*2]=index1;
-		pShuffleList[(newLength-1)*2+1]=index2;
-	}
+		return last;
+	/* pShuffleList now is surely non null */
+	for (temp=pShuffleList;temp->next;temp=temp->next);
+	temp->last;
 	return pShuffleList;
 }
-
-
 
 static int getCount(const int array[SQUARE_SIZE], int visible[SQUARE_SIZE])
 {
@@ -434,17 +416,18 @@ static int getCount(const int array[SQUARE_SIZE], int visible[SQUARE_SIZE])
 	return count;
 }
 
-static int increaseCount(int array[SQUARE_SIZE], int reqCount)
+static int increaseCount(int array[SQUARE_SIZE], int reqCount, int* pIndex1, int *pIndex2)
 {
 	int i,j,temp,count;
 	int attempt[SQUARE_SIZE];
 	int visible[SQUARE_SIZE];
-	int swapIndex1, swapIndex2, swapIndex3, swapIndex4, maxCount;
+	int swapIndex1, swapIndex2, swapIndex3, swapIndex4, maxCount, minCount;
 	swapIndex1=-1;
 	swapIndex2=-1;
 	swapIndex3=-1;
 	swapIndex4=-1;
 	maxCount=-1;
+	minCount = SQUARE_SIZE+1;
 	count = getCount(array,visible);
 
 	for (i=0;i<SQUARE_SIZE;++i)
@@ -467,6 +450,8 @@ static int increaseCount(int array[SQUARE_SIZE], int reqCount)
 					array[i] = array[j];
 					array[j] = temp;
 					printf("swapping %i and %i, done\n",i,j);
+					*pIndex1=i;
+					*pIndex2=j;
 					return 0;
 				}
 
@@ -512,6 +497,8 @@ static int increaseCount(int array[SQUARE_SIZE], int reqCount)
 		array[swapIndex1] = array[swapIndex2];
 		array[swapIndex2] = temp;
 		printf("swapping %i and %i, count increased but not done yet\n",swapIndex1,swapIndex2);
+		*pIndex1=swapIndex1;
+		*pIndex2=swapIndex2;
 		return 1;
 	}
 	if ((swapIndex3>=0) || (swapIndex4>=0))
@@ -520,8 +507,11 @@ static int increaseCount(int array[SQUARE_SIZE], int reqCount)
 		array[swapIndex3] = array[swapIndex4];
 		array[swapIndex4] = temp;
 		printf("swapping %i and %i, count still the same\n",swapIndex3,swapIndex4);
+		*pIndex1=swapIndex3;
+		*pIndex2=swapIndex4;
 		return 2;
 	}
+	printf("ERROR: unhandled situation\n");
 	return -1;
 }
 
@@ -578,20 +568,22 @@ static int decreaseCount(int array[SQUARE_SIZE], int reqCount)
 	return 1;
 }
 
-static void getShuffleList(const int array[SQUARE_SIZE], int reqCount)
+static struct Shuffle* getShuffleList(const int square[SQUARE_SIZE][SQUARE_SIZE], PointOfView view, int index, int reqCount, struct Shuffle* pShuffleList)
 {
 	int i,j, count, last, temp, numShuffles, delta, topPosition, bestMin, bestMax;
 	int i1, i2;
 	int visible[SQUARE_SIZE];
 	int copy[SQUARE_SIZE];
-	int attempt[SQUARE_SIZE];
+	int array[SQUARE_SIZE];
 	int* result;
 	int goingUp;
 	int iterations;
-	memcpy(&copy[0],&array[0],SQUARE_SIZE*sizeof(int));
+
+	getArrayFromSquare(square,view,index,array);
+
 	for (iterations=0;iterations<3*SQUARE_SIZE;iterations++)
 	{
-		count = getCount(copy,NULL);
+		count = getCount(array,NULL);
 
 		if (count == reqCount)
 		{
@@ -601,11 +593,13 @@ static void getShuffleList(const int array[SQUARE_SIZE], int reqCount)
 		goingUp = (count<reqCount)?1:0;
 
 		if (goingUp)
-			temp = increaseCount(copy,reqCount);
+			increaseCount(array,reqCount,&i1,&i2);
 		else
-			temp = decreaseCount(copy,reqCount);
+			decreaseCount(array,reqCount,&i1,&i2);
 
+		pShuffleList = addShuffle(pShuffleList,view,i1,i2);
 	} /* main loop */
+	return pShuffleList;
 }
 
 
