@@ -31,7 +31,19 @@ static int compare(void* p1, void* p2)
 
 static struct color_area* addArea(struct color_area* pAreas, struct color_area* pNew)
 {
+  if (pAreas==NULL)
+  {
+    pAreas = (struct color_area*)malloc(sizeof(struct color_area));
+    if (pAreas==NULL)
+    {
+      printf("ERROR: malloc failed\n");
+      return NULL;
+    }
+    pAreas->color = pNew->color;
 
+  }
+  else
+  {}
 }
 
 static struct color_area* findArea(struct color_area* pAreas, unsigned color)
@@ -43,12 +55,17 @@ static struct color_area* findArea(struct color_area* pAreas, unsigned color)
 
 static void addRow(struct color_area* pArea, int startPosition, int rowLength)
 {
+  if (pArea==NULL)
+  {
+    printf("ERROR: pArea is null\n");
+    return;
+  }
 
 }
 
 static struct color_area* getColorAreas(Image image, int* pLength)
 {
-  struct color_area* pResult,*temp;
+  struct color_area** pResult,*temp;
   int i,j,startPosition,size,numAreas;
   unsigned lastColor,currentColor;
   for (pResult=NULL,numAreas=0,i=0;i<image.height;i++)
