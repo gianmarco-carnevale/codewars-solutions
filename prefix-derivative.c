@@ -824,64 +824,22 @@ static struct Expression* copyExpression(struct Expression* pExpr)
   struct Expression* result;
   if (pExpr==NULL)
     return NULL;
+  result = (struct Expression*)malloc(sizeof(struct Expression));
+  if (result==NULL)
+  {
+    printf("ERROR: malloc in copyExpression\n");
+    return NULL;
+  }
+  memcpy((char*)result,(char*)pExpr,sizeof(struct Expression));
   if (pExpr->type == EXPR_OPERATION)
   {
-    result = (struct Expression*)malloc(sizeof(struct Expression));
-    if (result==NULL)
-    {
-      printf("ERROR: malloc in copyExpression\n");
-      return NULL;
-    }
-    *result = *pExpr;
     result->uExpression.sOperation.arg1 = copyExpression(pExpr->uExpression.sOperation.arg1);
     if (result->uExpression.sOperation.twoArgsRequired)
       result->uExpression.sOperation.arg2 = copyExpression(pExpr->uExpression.sOperation.arg2);
     else
       result->uExpression.sOperation.arg2 = NULL;
   }
-  else
-  {
-    if (pExpr->type == EXPR_SINGLE)
-    {
-      if (pExpr->uExpression.sArgument.type == VARIABLE_X)
-      {
-        return createVariableX();
-      }
-      else
-      {
-        if (pExpr->uExpression.sArgument.type == CONSTANT_VALUE)
-        {
-          if (pExpr->uExpression.sArgument.uArgument.sConstant.type == CONST_INT)
-          {
-            return createIntConstant(pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.intValue);
-          }
-          else
-          {
-            if (pExpr->uExpression.sArgument.uArgument.sConstant.type == CONST_FLOAT)
-            {
-              return createFloatConstant(pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue);
-            }
-            else
-            {
-              printf("ERROR: wrong constant type: %i\n",pExpr->uExpression.sArgument.uArgument.sConstant.type);
-              return NULL;
-            }
-          }
-        }
-        else
-        {
-          printf("ERROR: argument type: %i\n",pExpr->uExpression.sArgument.type);
-          return NULL;
-        }
-      }
-    }
-    else
-    {
-      printf("ERROR: wrong expression type: %i\n",pExpr->type);
-      return NULL;
-    }
-  }
-  return NULL;
+  return result;
 }
 
 static struct Expression* getIntOperation(int a, int b, int opcode)
@@ -948,12 +906,73 @@ static struct Expression* getFloatOperation(float a, float b, int opcode)
     break;
   }
 }
-
+static struct Expression* symplify(struct Expression* pExpr);
 static struct Expression* symplifyBinaryOperation(struct Expression* first, struct Expression* second, int opcode)
 {
   struct Expression* result, *temp;
   int intA, intB;
   float floatA, floatB;
+  /*-----------------------------------------------------------------*/
+  if (isConstant(first) && isZero(first))
+  {
+	switch (opcode)
+	{
+	  case OPCODE_PLUS:
+	    return symplify(second);
+	  break;
+	  case OPCODE_MULTIPLY:
+	    return createIntConstant(0);
+	  break;
+	  default:
+	  break;
+	}
+  }
+  if (isConstant(second) && isZero(second))
+  {
+	switch (opcode)
+	{
+	  case OPCODE_PLUS:
+	  case OPCODE_MINUS:
+	    return symplify(first);
+	  break;
+	  case OPCODE_MULTIPLY:
+	    return createIntConstant(0);
+	  break;
+	  case OPCODE_DIVIDE:
+	    printf("ERROR: division by zero\n");
+		return NULL;
+	  break;
+	  default:
+	  break;
+	}
+  }
+  if (isConstant(first) && isOne(first))
+  {
+	switch (opcode)
+	{
+	  case OPCODE_MULTIPLY:
+	    return symplify(second);
+	  break;
+	  case OPCODE_POWER:
+	    return createIntConstant(1);
+	  break;
+	  default:
+	  break;
+	}
+  }
+  if (isConstant(second) && isOne(second))
+  {
+	switch (opcode)
+	{
+	  case OPCODE_MULTIPLY:
+	  case OPCODE_DIVIDE:
+	  case OPCODE_POWER:
+	    return symplify(first);
+	  break;
+	  default:
+	  break;
+	}
+  }
   /*------------ both expressions are constant values ---------------*/
   if ((isConstant(first)) && (isConstant(second)))
   {
@@ -1102,6 +1121,7 @@ static struct Expression* symplifyBinaryOperation(struct Expression* first, stru
     return NULL;
   }
   /*------------ generic situation ---------------*/
+  
   result = (struct Expression*)malloc(sizeof(struct Expression));
   if (result==NULL)
   {
@@ -1172,11 +1192,11 @@ static struct Expression* symplify(struct Expression* pExpr)
 int main(int argc, char* argv[])
 {
   int n,c;
-  char s[]="(* (ln (+ x 8)) (+ x (^ x (/ x -5))))";
+  char s[]="(* (- x x) (ln x))";
   char** p;
   int i;
   struct Expression* pExp = getExpressionFromString(s);
-  printExpression(pExp);
+  printExpression(symplify(pExp));
   printf("\n");
   /*
   p = parseExpression(s);
