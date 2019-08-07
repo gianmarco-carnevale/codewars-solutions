@@ -9,10 +9,10 @@ struct VariableX;
 struct Argument;
 struct Expression;
 struct Operation;
-/*---------------*/
-union ConstUnion;
-union ArgUnion;
-union ExprUnion;
+/*-------------------------*/
+union ExpressionUnion;
+union ArgumentUnion;
+union ConstantUnion;
 /*----------------------------------------------------------------------------*/
 #define CONST_INT        1
 #define CONST_FLOAT      2
@@ -34,16 +34,16 @@ union ExprUnion;
 #define EXPR_OPERATION   2
 #define EXPR_INVALID     3
 /*--------------------------*/
-union ConstUnion
+union ConstantUnion
 {
   int intValue;
-  float flValue;
+  float floatValue;
 };
 
 struct Constant
 {
   int type;
-  union ConstUnion uValue;
+  union ConstantUnion uConstant;
 };
 
 struct VariableX
@@ -51,36 +51,36 @@ struct VariableX
   int _not_used;
 };
 
-union ArgUnion
+union ArgumentUnion
 {
-  struct Constant  constValue;
+  struct Constant  sConstant;
   struct VariableX _x_not_used;
 };
 
 struct Argument
 {
   int type;
-  union ArgUnion uArg;
+  union ArgumentUnion uArgument;
 };
 
 struct Operation
 {
   int opcode;
-  int secondArgRequired;
-  struct Expression* pArg1;
-  struct Expression* pArg2;
+  int twoArgsRequired;
+  struct Expression* arg1;
+  struct Expression* arg2;
 };
 
 union ExpressionUnion
 {
-  struct Operation operation;
-  struct Argument singleArg;
+  struct Operation sOperation;
+  struct Argument sArgument;
 };
 
 struct Expression
 {
   int type;
-  union ExpressionUnion uExpr;
+  union ExpressionUnion uExpression;
 };
 
 /*----------------------------------------------------------------------------*/
@@ -89,55 +89,55 @@ static int getOperationFromString(char* input, struct Operation* pOperation)
   if (strcmp(input,"+")==0)
   {
     pOperation->opcode = OPCODE_PLUS;
-    pOperation->secondArgRequired = 1;
+    pOperation->twoArgsRequired = 1;
     return 0;
   }
   if (strcmp(input,"-")==0)
   {
     pOperation->opcode = OPCODE_MINUS;
-    pOperation->secondArgRequired = 1;
+    pOperation->twoArgsRequired = 1;
     return 0;
   }
   if (strcmp(input,"*")==0)
   {
     pOperation->opcode = OPCODE_MULTIPLY;
-    pOperation->secondArgRequired = 1;
+    pOperation->twoArgsRequired = 1;
     return 0;
   }
   if (strcmp(input,"/")==0)
   {
     pOperation->opcode = OPCODE_DIVIDE;
-    pOperation->secondArgRequired = 1;
+    pOperation->twoArgsRequired = 1;
     return 0;
   }
   if (strcmp(input,"^")==0)
   {
     pOperation->opcode = OPCODE_POWER;
-    pOperation->secondArgRequired = 1;
+    pOperation->twoArgsRequired = 1;
     return 0;
   }
   if (strcmp(input,"sin")==0)
   {
     pOperation->opcode = OPCODE_SIN;
-    pOperation->secondArgRequired = 0;
+    pOperation->twoArgsRequired = 0;
     return 0;
   }
   if (strcmp(input,"cos")==0)
   {
     pOperation->opcode = OPCODE_COS;
-    pOperation->secondArgRequired = 0;
+    pOperation->twoArgsRequired = 0;
     return 0;
   }
   if (strcmp(input,"tan")==0)
   {
     pOperation->opcode = OPCODE_TAN;
-    pOperation->secondArgRequired = 0;
+    pOperation->twoArgsRequired = 0;
     return 0;
   }
   if (strcmp(input,"ln")==0)
   {
     pOperation->opcode = OPCODE_LN;
-    pOperation->secondArgRequired = 0;
+    pOperation->twoArgsRequired = 0;
     return 0;
   }
   return -1;
@@ -146,55 +146,48 @@ static int getOperationFromString(char* input, struct Operation* pOperation)
 static int getSingleArgumentFromString(char* input, struct Expression* pExpr)
 {
   int intConstant;
-  float flConstant;
+  float floatConstant;
   char* endPtr;
   if (strcmp(input,"x")==0)
   {
     pExpr->type = EXPR_SINGLE;
-    pExpr->uExpr.singleArg.type = VARIABLE_X;
+    pExpr->uExpression.sArgument.type = VARIABLE_X;
     return 0;
   }
   intConstant = strtol(input,&endPtr,10);
   if (endPtr[0]==0)
   {
     pExpr->type = EXPR_SINGLE;
-    pExpr->uExpr.singleArg.type = CONSTANT_VALUE;
-    pExpr->uExpr.singleArg.uArg.constValue.type = CONST_INT;
-    pExpr->uExpr.singleArg.uArg.constValue.uValue.intValue = intConstant;
+    pExpr->uExpression.sArgument.type = CONSTANT_VALUE;
+    pExpr->uExpression.sArgument.uArgument.sConstant.type = CONST_INT;
+    pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.intValue = intConstant;
     return 0;
   }
-  flConstant = strtod(input,&endPtr);
+  floatConstant = strtod(input,&endPtr);
   if (endPtr[0]==0)
   {
     pExpr->type = EXPR_SINGLE;
-    pExpr->uExpr.singleArg.type = CONSTANT_VALUE;
-    pExpr->uExpr.singleArg.uArg.constValue.type = CONST_FLOAT;
-    pExpr->uExpr.singleArg.uArg.constValue.uValue.intValue = flConstant;
+    pExpr->uExpression.sArgument.type = CONSTANT_VALUE;
+    pExpr->uExpression.sArgument.uArgument.sConstant.type = CONST_FLOAT;
+    pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.intValue = floatConstant;
     return 0;
   }
-  printf("ERROR: failed to get constant\n");
+  printf("ERROR: failed to get constant from %s\n",input);
   return -1;
 }
 
-#define STATE_AWAITING_FIRST_SYMBOL      0
-#define STATE_AWAITING_OPERATION         1
-#define STATE_AWAITING_ARGUMENT          2
-#define STATE_AWAITING_CLOSED_BRACKET    3
-#define STATE_DONE                       4
-#define STATE_ERROR                      5
 
+#define ARG_STATE_AWAITING_EXPRESSION      0
+#define ARG_STATE_GATHERING_EXPRESSION     1
 
 static char** parseArguments(const char* input)
 {
-  int state;
-  int length=0;
-  int brackets;
-  int argId;
+  int state, length, brackets, argId;
   char** result;
   result = (char**)calloc(2,sizeof(char*));
   if (result==NULL)
   {
-    printf("ERROR: calloc\n");
+    printf("ERROR: calloc in parseArguments\n");
     return NULL;
   }
   result[0]=NULL;
@@ -202,7 +195,7 @@ static char** parseArguments(const char* input)
   for (argId=0,length=0,state=0;;++input)
   switch (state)
   {
-    case 0:
+    case ARG_STATE_AWAITING_EXPRESSION:
       switch (input[0])
       {
         case 0:
@@ -214,7 +207,7 @@ static char** parseArguments(const char* input)
           {
             if (argId==1)
             {
-              state = 0;
+              state = ARG_STATE_AWAITING_EXPRESSION;
             }
             else
             {
@@ -223,7 +216,7 @@ static char** parseArguments(const char* input)
           }
         break;
         case '(':
-          state=1;
+          state=ARG_STATE_GATHERING_EXPRESSION;
           brackets=1;
         default:
           if (result[argId]==NULL)
@@ -231,6 +224,7 @@ static char** parseArguments(const char* input)
             result[argId]=(char*)malloc(2*sizeof(char));
             if (result[argId]==NULL)
             {
+              printf("ERROR: malloc in parseArguments\n");
               if (result[0])
                 free(result[0]);
               free(result);
@@ -241,6 +235,7 @@ static char** parseArguments(const char* input)
           else
           {
             result[argId] = (char*)realloc(result[argId],sizeof(char)*(length+2));
+            printf("ERROR: realloc 1 in parseArguments\n");
             if (result[argId]==NULL)
             {
               if (result[0])
@@ -255,10 +250,11 @@ static char** parseArguments(const char* input)
         break;
       }
     break;
-    case 1:
+    case ARG_STATE_GATHERING_EXPRESSION:
       result[argId] = (char*)realloc(result[argId],sizeof(char)*(length+2));
       if (result[argId]==NULL)
       {
+        printf("ERROR: realloc 2 in parseArguments\n");
         if (result[0])
           free(result[0]);
         free(result);
@@ -283,25 +279,33 @@ static char** parseArguments(const char* input)
             else
             {
               ++argId;
-              state = 0;
+              state = ARG_STATE_AWAITING_EXPRESSION;
             }
           }
         break;
         default:
+            /* do nothing, gathering the string */
         break;
       }
     break;
     default:
+      printf("ERROR: unhandled state %i\n",state);
       return NULL;
     break;
   }
   return NULL;
 }
 
+#define EXPR_STATE_AWAITING_FIRST_SYMBOL      0
+#define EXPR_STATE_AWAITING_OPERATION         1
+#define EXPR_STATE_AWAITING_ARGUMENT          2
+#define EXPR_STATE_DONE                       3
+#define EXPR_STATE_ERROR                      4
+
+
 static char** parseExpression(const char* input)
 {
-  int state;
-  int length;
+  int state, length;
   const int exprLength = 16;
   const int opLength = 4;
   char expressionString[exprLength];
@@ -311,17 +315,17 @@ static char** parseExpression(const char* input)
   result = (char**)calloc(3,sizeof(char*));
   if (result==NULL)
   {
-    printf("ERROR: calloc\n");
+    printf("ERROR: calloc in parseExpression\n");
     return NULL;
   }
   result[0]=NULL;
   result[1]=NULL;
   result[2]=NULL;
-  for (length=0,state=STATE_AWAITING_FIRST_SYMBOL;;++input)
+  for (length=0,state=EXPR_STATE_AWAITING_FIRST_SYMBOL;;++input)
   {
     switch (state)
     {
-      case STATE_AWAITING_FIRST_SYMBOL:
+      case EXPR_STATE_AWAITING_FIRST_SYMBOL:
         switch (input[0])
         {
           case 0:
@@ -333,7 +337,7 @@ static char** parseExpression(const char* input)
               if (result[0]==NULL)
               {
                 free(result);
-                printf("ERROR: malloc\n");
+                printf("ERROR: malloc 1 in parseExpression\n");
                 return NULL;
               }
               strcpy(result[0],expressionString);
@@ -342,7 +346,7 @@ static char** parseExpression(const char* input)
           break;
           case '(':
             length=0;
-            state = STATE_AWAITING_OPERATION;
+            state = EXPR_STATE_AWAITING_OPERATION;
           break;
           default:
             if (length<exprLength)
@@ -352,12 +356,12 @@ static char** parseExpression(const char* input)
             else
             {
               printf("first argument too long");
-              state = STATE_ERROR;
+              state = EXPR_STATE_ERROR;
             }
           break;
         }
       break;
-      case STATE_AWAITING_OPERATION:
+      case EXPR_STATE_AWAITING_OPERATION:
         if (input[0] == ' ')
         {
           if (length>0)
@@ -367,12 +371,12 @@ static char** parseExpression(const char* input)
             if (result[0]==NULL)
             {
               free(result);
-              printf("ERROR: malloc\n");
+              printf("ERROR: malloc 2 in parseExpression\n");
               return NULL;
             }
             strcpy(result[0],operationString);
             length=0;
-            state = STATE_AWAITING_ARGUMENT;
+            state = EXPR_STATE_AWAITING_ARGUMENT;
           }
           else
             continue;
@@ -385,15 +389,18 @@ static char** parseExpression(const char* input)
           }
           else
           {
-            printf("operation too long");
-            state = STATE_ERROR;
+            printf("ERROR: sOperation too long\n");
+            state = EXPR_STATE_ERROR;
           }
         }
       break;
-      case STATE_AWAITING_ARGUMENT:
+      case EXPR_STATE_AWAITING_ARGUMENT:
         args = parseArguments(input);
         if (args==NULL)
-          return NULL;
+        {
+		  printf("ERROR: got null arguments\n");
+		  return NULL;
+        }
         else
         {
           result[1]=args[0];
@@ -401,14 +408,13 @@ static char** parseExpression(const char* input)
           return result;
         }
       break;
-      case STATE_DONE:
-        return result;
-      break;
-      case STATE_ERROR:
+      case EXPR_STATE_ERROR:
         printf("ERROR: parse error\n");
         return NULL;
       default:
+        printf("ERROR: unhandled state %i\n",state);
         return NULL;
+      break;
     }
   }
   return NULL;
@@ -419,10 +425,12 @@ static struct Expression* getExpressionFromString(char* input)
   struct Expression* result;
   char** pStrings;
   int count,i;
+  if (input==NULL)
+	return NULL;
   pStrings = parseExpression(input);
   if (pStrings==NULL)
   {
-    printf("ERROR: null pointer");
+    printf("ERROR: null pointer from parseExpression\n");
     return NULL;
   }
   printf("****** Receiving: %s ********\n",pStrings[0]);
@@ -455,16 +463,16 @@ static struct Expression* getExpressionFromString(char* input)
     case 2:
     case 3:
       result->type = EXPR_OPERATION;
-      if (getOperationFromString(pStrings[0],&result->uExpr.operation))
+      if (getOperationFromString(pStrings[0],&result->uExpression.sOperation))
       {
         printf("ERROR: getOperationFromString failed\n");
         free(result);
         result = NULL;
       }
-      printf("OpCode: %i\n",result->uExpr.operation.opcode);
+      printf("OpCode: %i\n",result->uExpression.sOperation.opcode);
       printf("args: %s %s\n",pStrings[1],pStrings[2]);
-      result->uExpr.operation.pArg1 = getExpressionFromString(pStrings[1]);
-      if (result->uExpr.operation.pArg1 == NULL)
+      result->uExpression.sOperation.arg1 = getExpressionFromString(pStrings[1]);
+      if (result->uExpression.sOperation.arg1 == NULL)
       {
         printf("ERROR: getExpressionFromString 1 failed\n");
         free(result);
@@ -472,22 +480,22 @@ static struct Expression* getExpressionFromString(char* input)
       }
       else
       {
-        if (result->uExpr.operation.secondArgRequired)
+        if (result->uExpression.sOperation.twoArgsRequired)
         {
           if (pStrings[2]==NULL)
           {
-            printf("ERROR: arg2 required for opcode %i but null string\n",result->uExpr.operation.opcode);
-            free(result->uExpr.operation.pArg1);
+            printf("ERROR: arg2 required for opcode %i but null string\n",result->uExpression.sOperation.opcode);
+            free(result->uExpression.sOperation.arg1);
             free(result);
             result = NULL;
           }
           else
           {
-            result->uExpr.operation.pArg2 = getExpressionFromString(pStrings[2]);
-            if (result->uExpr.operation.pArg2==NULL)
+            result->uExpression.sOperation.arg2 = getExpressionFromString(pStrings[2]);
+            if (result->uExpression.sOperation.arg2==NULL)
             {
               printf("ERROR: getExpressionFromString 2 failed\n");
-              free(result->uExpr.operation.pArg1);
+              free(result->uExpression.sOperation.arg1);
               free(result);
               result = NULL;
             }
@@ -496,6 +504,7 @@ static struct Expression* getExpressionFromString(char* input)
       }
     break;
     default:
+	  printf("ERROR: unexpected case!!!\n");
       free(result);
       result = NULL;
     break;
@@ -516,19 +525,19 @@ static void printExpression(struct Expression* pExpr)
     printf("ERROR:\n");
   if (pExpr->type == EXPR_SINGLE)
   {
-    if (pExpr->uExpr.singleArg.type == VARIABLE_X)
+    if (pExpr->uExpression.sArgument.type == VARIABLE_X)
       printf(" x ");
     else
     {
-      if (pExpr->uExpr.singleArg.type == CONSTANT_VALUE)
+      if (pExpr->uExpression.sArgument.type == CONSTANT_VALUE)
       {
-        if (pExpr->uExpr.singleArg.uArg.constValue.type = CONST_INT)
-          printf(" %i ",pExpr->uExpr.singleArg.uArg.constValue.uValue.intValue);
+        if (pExpr->uExpression.sArgument.uArgument.sConstant.type = CONST_INT)
+          printf(" %i ",pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.intValue);
         else
         {
-          if (pExpr->uExpr.singleArg.uArg.constValue.type = CONST_FLOAT)
+          if (pExpr->uExpression.sArgument.uArgument.sConstant.type = CONST_FLOAT)
           {
-            printf(" %f ",pExpr->uExpr.singleArg.uArg.constValue.uValue.flValue);
+            printf(" %f ",pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue);
           }
           else
             printf("ERROR3\n");
@@ -541,7 +550,7 @@ static void printExpression(struct Expression* pExpr)
     if (pExpr->type == EXPR_OPERATION)
     {
       printf("(");
-      switch (pExpr->uExpr.operation.opcode)
+      switch (pExpr->uExpression.sOperation.opcode)
       {
         case OPCODE_PLUS:
           printf("+");
@@ -571,9 +580,9 @@ static void printExpression(struct Expression* pExpr)
           printf("ln");
         break;
       }
-      printExpression(pExpr->uExpr.operation.pArg1);
-      if (pExpr->uExpr.operation.secondArgRequired)
-        printExpression(pExpr->uExpr.operation.pArg2);
+      printExpression(pExpr->uExpression.sOperation.arg1);
+      if (pExpr->uExpression.sOperation.twoArgsRequired)
+        printExpression(pExpr->uExpression.sOperation.arg2);
       printf(")");
     }
     else
@@ -593,9 +602,9 @@ static struct Expression* createIntConstant(int x)
     return NULL;
   }
   result->type = EXPR_SINGLE;
-  result->uExpr.singleArg.type = CONSTANT_VALUE;
-  result->uExpr.singleArg.constValue.type = CONST_INT;
-  result->uExpr.singleArg.constValue.uValue.intValue = x;
+  result->uExpression.sArgument.type = CONSTANT_VALUE;
+  result->uExpression.sArgument.uArgument.sConstant.type = CONST_INT;
+  result->uExpression.sArgument.uArgument.sConstant.uConstant.intValue = x;
   return result;
 }
 
@@ -609,9 +618,9 @@ static struct Expression* createFlConstant(float x)
     return NULL;
   }
   result->type = EXPR_SINGLE;
-  result->uExpr.singleArg.type = CONSTANT_VALUE;
-  result->uExpr.singleArg.constValue.type = CONST_FLOAT;
-  result->uExpr.singleArg.constValue.uValue.flValue = x;
+  result->uExpression.sArgument.type = CONSTANT_VALUE;
+  result->uExpression.sArgument.uArgument.sConstant.type = CONST_FLOAT;
+  result->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue = x;
   return result;
 }
 
@@ -625,7 +634,7 @@ static struct Expression* createVariableX()
     return NULL;
   }
   result->type = EXPR_SINGLE;
-  result->uExpr.singleArg.type = VARIABLE_X;
+  result->uExpression.sArgument.type = VARIABLE_X;
   return result;
 }
 
@@ -635,7 +644,7 @@ static int isConstant(struct Expression* pExpr)
     return 0;
   if (pExpr->type!=EXPR_SINGLE)
     return 0;
-  if (pExpr->uExpr.singleArg.type!=CONSTANT_VALUE)
+  if (pExpr->uExpression.sArgument.type!=CONSTANT_VALUE)
     return 0;
   return 1;
 }
@@ -646,14 +655,14 @@ static int isZero(struct Expression* pExpr)
   if (!isConstant(pExpr))
     return 0;
   */
-  if (pExpr->uExpr.singleArg.uValue.constValue.type == CONST_INT)
+  if (pExpr->uExpression.sArgument.uArgument.sConstant.type == CONST_INT)
   {
-    if (pExpr->uExpr.singleArg.uValue.constValue.uValue.intValue == 0)
+    if (pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.intValue == 0)
       return 1;
   }
-  if (pExpr->uExpr.singleArg.uValue.constValue.type == CONST_FLOAT)
+  if (pExpr->uExpression.sArgument.uArgument.sConstant.type == CONST_FLOAT)
   {
-    if (pExpr->uExpr.singleArg.uValue.constValue.uValue.flValue == 0.0)
+    if (pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue == 0.0)
       return 1;
   }
   return 0;
@@ -665,14 +674,14 @@ static int isOne(struct Expression* pExpr)
   if (!isConstant(pExpr))
     return 0;
   */
-  if (pExpr->uExpr.singleArg.uValue.constValue.type == CONST_INT)
+  if (pExpr->uExpression.sArgument.uArgument.sConstant.type == CONST_INT)
   {
-    if (pExpr->uExpr.singleArg.uValue.constValue.uValue.intValue == 1)
+    if (pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.intValue == 1)
       return 1;
   }
-  if (pExpr->uExpr.singleArg.uValue.constValue.type == CONST_FLOAT)
+  if (pExpr->uExpression.sArgument.uArgument.sConstant.type == CONST_FLOAT)
   {
-    if (pExpr->uExpr.singleArg.uValue.constValue.uValue.flValue == 1.0)
+    if (pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue == 1.0)
       return 1;
   }
   return 0;
@@ -684,7 +693,7 @@ static int isVariableX(struct Expression* pExpr)
     return 0;
   if (pExpr->type!=EXPR_SINGLE)
     return 0;
-  if (pExpr->uExpr.singleArg.type!=VARIABLE_X)
+  if (pExpr->uExpression.sArgument.type!=VARIABLE_X)
     return 0;
   return 1;
 }
@@ -703,33 +712,33 @@ static struct Expression* copyExpression(struct Expression* pExpr)
       return NULL;
     }
     *result = *pExpr;
-    result->uExpr.operation.pArg1 = copyExpression(pExpr->uExpr.operation.pArg1);
-    if (result->uExpr.operation.secondArgRequired)
-      result->uExpr.operation.pArg2 = copyExpression(pExpr->uExpr.operation.pArg2);
+    result->uExpression.sOperation.arg1 = copyExpression(pExpr->uExpression.sOperation.arg1);
+    if (result->uExpression.sOperation.twoArgsRequired)
+      result->uExpression.sOperation.arg2 = copyExpression(pExpr->uExpression.sOperation.arg2);
     else
-      result->uExpr.operation.pArg2 = NULL;
+      result->uExpression.sOperation.arg2 = NULL;
   }
   else
   {
     if (pExpr->type == EXPR_SINGLE)
     {
-      if (pExpr->uExpr.singleArg.type == VARIABLE_X)
+      if (pExpr->uExpression.sArgument.type == VARIABLE_X)
       {
         return createVariableX();
       }
       else
       {
-        if (pExpr->uExpr.singleArg.type == CONSTANT_VALUE)
+        if (pExpr->uExpression.sArgument.type == CONSTANT_VALUE)
         {
-          if (pExpr->uExpr.singleArg.uArg.constValue.type == CONST_INT)
+          if (pExpr->uExpression.sArgument.uArgument.sConstant.type == CONST_INT)
           {
-            return createIntConstant(pExpr->uExpr.singleArg.uArg.constValue.intValue);
+            return createIntConstant(pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.intValue);
           }
           else
           {
-            if (pExpr->uExpr.singleArg.uArg.constValue.type == CONST_FLOAT)
+            if (pExpr->uExpression.sArgument.uArgument.sConstant.type == CONST_FLOAT)
             {
-              return createFlConstant(pExpr->uExpr.singleArg.uArg.constValue.flValue);
+              return createFlConstant(pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue);
             }
             else
             {
@@ -823,28 +832,28 @@ static struct Expression* symplifyBinaryOperation(struct Expression* first, stru
   float floatA, floatB;
   if ((isConstant(first)) && (isConstant(second)))
   {
-    if ((first->uExpr.singleArg.uValue.type = CONST_INT)&&(second->uExpr.singleArg.uValue.type = CONST_INT))
+    if ((first->uExpression.sArgument.type = CONST_INT)&&(second->uExpression.sArgument.uArgument.sConstant.type = CONST_INT))
     {
-      intA = first->uExpr.singleArg.uValue.constValue.intValue;
-      intB = second->uExpr.singleArg.uValue.constValue.intValue;
+      intA = first->uExpression.sArgument.uArgument.sConstant.uConstant.intValue;
+      intB = second->uExpression.sArgument.uArgument.sConstant.uConstant.intValue;
       return getIntOperation(intA, intB, opcode);
     }
-    if ((first->uExpr.singleArg.uValue.type = CONST_INT)&&(second->uExpr.singleArg.uValue.type = CONST_FLOAT))
+    if ((first->uExpression.sArgument.type = CONST_INT)&&(second->uExpression.sArgument.uArgument.sConstant.type = CONST_FLOAT))
     {
-      floatA = (float)first->uExpr.singleArg.uValue.constValue.intValue;
-      floatB = second->uExpr.singleArg.uValue.constValue.flValue;
+      floatA = (float)first->uExpression.sArgument.uArgument.sConstant.uConstant.intValue;
+      floatB = second->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue;
       return getIntOperation(floatA, floatB, opcode);
     }
-    if ((first->uExpr.singleArg.uValue.type = CONST_FLOAT)&&(second->uExpr.singleArg.uValue.type = CONST_INT))
+    if ((first->uExpression.sArgument.uArgument.sConstant.type = CONST_FLOAT)&&(second->uExpression.sArgument.uArgument.sConstant.type = CONST_INT))
     {
-      floatA = first->uExpr.singleArg.uValue.constValue.flValue;
-      floatB = (float)second->uExpr.singleArg.uValue.constValue.intValue;
+      floatA = first->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue;
+      floatB = (float)second->uExpression.sArgument.uArgument.sConstant.uConstant.intValue;
       return getIntOperation(floatA, floatB, opcode);
     }
-    if ((first->uExpr.singleArg.uValue.type = CONST_FLOAT)&&(second->uExpr.singleArg.uValue.type = CONST_FLOAT))
+    if ((first->uExpression.sArgument.uArgument.sConstant.type = CONST_FLOAT)&&(second->uExpression.sArgument.uArgument.sConstant.type = CONST_FLOAT))
     {
-      floatA = first->uExpr.singleArg.uValue.constValue.flValue;
-      floatB = second->uExpr.singleArg.uValue.constValue.flValue;
+      floatA = first->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue;
+      floatB = second->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue;
       return getIntOperation(floatA, floatB, opcode);
     }
     return NULL;
@@ -861,18 +870,18 @@ static struct Expression* symplifyBinaryOperation(struct Expression* first, stru
     {
       case OPCODE_PLUS:
         result->type = EXPR_OPERATION;
-        result->uExpr.operation.opcode = OPCODE_MULTIPLY;
-        result->uExpr.operation.secondArgRequired = 1;
-        result->uExpr.operation.pArg1 = createVariableX();
-        result->uExpr.operation.pArg2 = createIntConstant(2);
+        result->uExpression.sOperation.opcode = OPCODE_MULTIPLY;
+        result->uExpression.sOperation.twoArgsRequired = 1;
+        result->uExpression.sOperation.arg1 = createVariableX();
+        result->uExpression.sOperation.arg2 = createIntConstant(2);
         return result;
       break;
       case OPCODE_MULTIPLY:
         result->type = EXPR_OPERATION;
-        result->uExpr.operation.opcode = OPCODE_POWER;
-        result->uExpr.operation.secondArgRequired = 1;
-        result->uExpr.operation.pArg1 = createVariableX();
-        result->uExpr.operation.pArg2 = createIntConstant(2);
+        result->uExpression.sOperation.opcode = OPCODE_POWER;
+        result->uExpression.sOperation.twoArgsRequired = 1;
+        result->uExpression.sOperation.arg1 = createVariableX();
+        result->uExpression.sOperation.arg2 = createIntConstant(2);
         return result;
       break;
       case OPCODE_MINUS:
@@ -882,10 +891,10 @@ static struct Expression* symplifyBinaryOperation(struct Expression* first, stru
       case OPCODE_DIVIDE:
       case OPCODE_POWER:
         result->type = EXPR_OPERATION;
-        result->uExpr.operation.opcode = opcode;
-        result->uExpr.operation.secondArgRequired = 1;
-        result->uExpr.operation.pArg1 = createVariableX();
-        result->uExpr.operation.pArg2 = createVariableX();
+        result->uExpression.sOperation.opcode = opcode;
+        result->uExpression.sOperation.twoArgsRequired = 1;
+        result->uExpression.sOperation.arg1 = createVariableX();
+        result->uExpression.sOperation.arg2 = createVariableX();
         return result;
       break;
       default:
@@ -896,7 +905,7 @@ static struct Expression* symplifyBinaryOperation(struct Expression* first, stru
     }
     return NULL;
   }
-  if ((isConstant(first)) && isVariableX(second)))
+  if ((isConstant(first)) && isVariableX(second))
   {
     temp = first;
     first = second;
@@ -944,10 +953,10 @@ static struct Expression* symplifyBinaryOperation(struct Expression* first, stru
             return NULL;
           }
           result->type = EXPR_OPERATION;
-          result->uExpr.operation.opcode = opcode;
-          result->uExpr.operation.secondArgRequired = 1;
-          result->uExpr.operation.pArg1 = createVariableX();
-          result->uExpr.operation.pArg2 = createIntConstant(1);
+          result->uExpression.sOperation.opcode = opcode;
+          result->uExpression.sOperation.twoArgsRequired = 1;
+          result->uExpression.sOperation.arg1 = createVariableX();
+          result->uExpression.sOperation.arg2 = createIntConstant(1);
           return result;
         break;
         case OPCODE_MULTIPLY:
@@ -983,14 +992,14 @@ static struct Expression* symplify(struct Expression* pExpr)
   }
   if (pExpr->type == EXPR_OPERATION)
   {
-    if (pExpr->uExpr.operation.secondArgRequired)
+    if (pExpr->uExpression.sOperation.twoArgsRequired)
     {
-      if ((pExpr->uExpr.operation.pArg1) && (pExpr->uExpr.operation.pArg2))
+      if ((pExpr->uExpression.sOperation.arg1) && (pExpr->uExpression.sOperation.arg2))
       {
-        if ((isConstant(pExpr->uExpr.operation.pArg1)) && (isConstant(pExpr->uExpr.operation.pArg2)))
+        if ((isConstant(pExpr->uExpression.sOperation.arg1)) && (isConstant(pExpr->uExpression.sOperation.arg2)))
         {
           result->type = EXPR_SINGLE;
-          result->uExpr.singleArg.type=CONSTANT_VALUE;
+          result->uExpression.sArgument.type=CONSTANT_VALUE;
         }
       }
       else
