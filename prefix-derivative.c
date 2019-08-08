@@ -28,7 +28,8 @@ union ExpressionUnion;
 #define OPCODE_SIN       6
 #define OPCODE_COS       7
 #define OPCODE_TAN       8
-#define OPCODE_LN        9
+#define OPCODE_EXP       9
+#define OPCODE_LN        10
 /*--------------------------*/
 #define EXPR_SINGLE      1
 #define EXPR_OPERATION   2
@@ -164,6 +165,12 @@ static int getOperationFromString(char* input, struct Operation* pOperation)
   if (strcmp(input,"tan")==0)
   {
     pOperation->opcode = OPCODE_TAN;
+    pOperation->twoArgsRequired = 0;
+    return 0;
+  }
+  if (strcmp(input,"exp")==0)
+  {
+    pOperation->opcode = OPCODE_EXP;
     pOperation->twoArgsRequired = 0;
     return 0;
   }
@@ -662,9 +669,9 @@ static size_t getExpressionLength(struct Expression* pExpr)
   if (pExpr->type == EXPR_OPERATION)
   {
     result = 8;
-	result += getExpressionLength(pExpr->uExpression.sOperation.arg1);
-	result += getExpressionLength(pExpr->uExpression.sOperation.arg2);
-	return result;
+    result += getExpressionLength(pExpr->uExpression.sOperation.arg1);
+    result += getExpressionLength(pExpr->uExpression.sOperation.arg2);
+    return result;
   }
   return 0;
 }
@@ -675,7 +682,7 @@ static char* printExpression(struct Expression* pExpr)
   char *result, *temp, *arg;
   result = (char*)Malloc(getExpressionLength(pExpr)+1);
   if (result==NULL)
-	return NULL;
+    return NULL;
   if (pExpr==NULL)
   {
     printf("ERROR: null pointer in printExpression\n");
@@ -684,25 +691,25 @@ static char* printExpression(struct Expression* pExpr)
   if (pExpr->type == EXPR_SINGLE)
   {
     if (pExpr->uExpression.sArgument.type == VARIABLE_X)
-	{
+    {
       n = sprintf(temp,"x");
-	  temp += n;
-	}
+      temp += n;
+    }
     else
     {
       if (pExpr->uExpression.sArgument.type == CONSTANT_VALUE)
       {
         if (pExpr->uExpression.sArgument.uArgument.sConstant.type == CONST_INT)
-		{
+        {
           n = sprintf(temp,"%i",pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.intValue);
-		  temp += n;
-		}
+          temp += n;
+        }
         else
         {
           if (pExpr->uExpression.sArgument.uArgument.sConstant.type == CONST_FLOAT)
           {
             n = sprintf(temp,"%f",pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue);
-			temp += n;
+            temp += n;
           }
           else
           {
@@ -717,68 +724,72 @@ static char* printExpression(struct Expression* pExpr)
     if (pExpr->type == EXPR_OPERATION)
     {
       n = sprintf(temp,"(");
-	  temp += n;
+      temp += n;
       switch (pExpr->uExpression.sOperation.opcode)
       {
         case OPCODE_PLUS:
           n = sprintf(temp,"+");
-		  temp += n;
+          temp += n;
         break;
         case OPCODE_MINUS:
           n = sprintf(temp,"-");
-		  temp += n;
+          temp += n;
         break;
         case OPCODE_MULTIPLY:
           n = sprintf(temp,"*");
-		  temp += n;
+          temp += n;
         break;
         case OPCODE_DIVIDE:
           n = sprintf(temp,"/");
-		  temp += n;
+          temp += n;
         break;
         case OPCODE_POWER:
           n = sprintf(temp,"^");
-		  temp += n;
+          temp += n;
         break;
         case OPCODE_SIN:
           n = sprintf(temp,"sin");
-		  temp += n;
+          temp += n;
         break;
         case OPCODE_COS:
           n = sprintf(temp,"cos");
-		  temp += n;
+          temp += n;
         break;
         case OPCODE_TAN:
           n = sprintf(temp,"tan");
-		  temp += n;
+          temp += n;
+        break;
+        case OPCODE_EXP:
+          n = sprintf(temp,"exp");
+          temp += n;
         break;
         case OPCODE_LN:
           n = sprintf(temp,"ln");
-		  temp += n;
+          temp += n;
         break;
         default:
           printf("ERROR: not an operation %i\n",pExpr->uExpression.sOperation.opcode);
         break;
       }
       n = sprintf(temp," ");
-	  temp += n;
-	  arg = printExpression(pExpr->uExpression.sOperation.arg1);
-	  n = strlen(arg);
+      temp += n;
+      arg = printExpression(pExpr->uExpression.sOperation.arg1);
+      n = strlen(arg);
       memcpy(temp,arg,n);
-	  Free(arg);
-	  temp += n;
+      Free(arg);
+      temp += n;
       if (pExpr->uExpression.sOperation.twoArgsRequired)
       {
         n = sprintf(temp," ");
-	    temp += n;
+        temp += n;
         arg = printExpression(pExpr->uExpression.sOperation.arg2);
-		n = strlen(arg);
-		memcpy(temp,arg,n);
-		Free(arg);
-		temp += n;
+        n = strlen(arg);
+        memcpy(temp,arg,n);
+        Free(arg);
+        temp += n;
       }
       n = sprintf(temp,")");
-	  temp += n;
+      temp += n;
     }
     else
     {
@@ -1266,6 +1277,7 @@ static struct Expression* createOperation(int opcode, struct Expression* arg1, s
     case OPCODE_SIN:
     case OPCODE_COS:
     case OPCODE_TAN:
+	case OPCODE_EXP:
     case OPCODE_LN:
       twoArgs=0;
       if (arg2!=NULL)
@@ -1392,6 +1404,9 @@ static struct Expression* differentiate(struct Expression* pExpr)
                                differentiate(first)
                               );
       break;
+      case OPCODE_EXP:
+        result = createOperation(OPCODE_MULTIPLY,differentiate(first),createOperation(OPCODE_EXP,copyExpression(first),NULL));
+      break;
       case OPCODE_LN:
         result = createOperation(OPCODE_DIVIDE,differentiate(first),copyExpression(first));
       break;
@@ -1409,11 +1424,10 @@ static struct Expression* differentiate(struct Expression* pExpr)
 }
 
 
-
 int main(int argc, char* argv[])
 {
   char* output;
-  char s[]="(^ x 2)";
+  char s[]="(exp (* 2 x))";
   struct Expression* pExp, *diff, *diff2, *final;
 
   pExp  = getExpressionFromString(s);
