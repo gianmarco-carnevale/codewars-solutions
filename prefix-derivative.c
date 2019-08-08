@@ -92,12 +92,12 @@ struct Expression
 
 
 
-#if 1
+static int mallocCalls = 0;
 static void* Malloc(size_t size)
 {
   void* result = malloc(size);
   if (result)
-    printf("Malloc: 0x%llx\n",result);
+    ++mallocCalls;
   return result;
 }
 
@@ -105,19 +105,16 @@ static void* Calloc(size_t num, size_t size)
 {
   void* result = calloc(num,size);
   if (result)
-    printf("Malloc: 0x%llx\n",result);
+    ++mallocCalls;
   return result;
 }
 
 static void Free(void* p)
 {
-  printf("Free  : 0x%llx\n",p);
+  --mallocCalls;
   free(p);
 }
-#else
-#define Malloc(x) malloc(x)
-#define Free(x) free(x)
-#endif
+
 
 /*----------------------------------------------------------------------------*/
 static int getOperationFromString(char* input, struct Operation* pOperation)
@@ -198,7 +195,6 @@ static int getSingleArgumentFromString(char* input, struct Expression* pExpr)
     pExpr->uExpression.sArgument.type = CONSTANT_VALUE;
     pExpr->uExpression.sArgument.uArgument.sConstant.type = CONST_INT;
     pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.intValue = intConstant;
-	printf("Here\n");
     return 0;
   }
   floatConstant = strtod(input,&endPtr);
@@ -236,8 +232,7 @@ static char** parseArguments(const char* input)
   result[1]=NULL;
   for (argId=0,length=0,state=ARG_STATE_AWAITING_ARGUMENT;;++input)
   {
-    printf("parseArguments state %i\n",state);
-	switch (state)
+    switch (state)
     {
       case ARG_STATE_AWAITING_ARGUMENT:
         switch (input[0])
@@ -420,7 +415,6 @@ static char** parseExpression(const char* input)
   result[2]=NULL;
   for (length=0,state=EXPR_STATE_AWAITING_FIRST_SYMBOL;;++input)
   {
-    printf("parseExpression state %i\n",state);
     switch (state)
     {
       case EXPR_STATE_AWAITING_FIRST_SYMBOL:
@@ -508,7 +502,7 @@ static char** parseExpression(const char* input)
         {
           result[1]=args[0];
           result[2]=args[1];
-		  Free(args);
+          Free(args);
           return result;
         }
       break;
@@ -588,9 +582,9 @@ static struct Expression* getExpressionFromString(char* input)
       {
         result->uExpression.sOperation.arg1 = getExpressionFromString(pStrings[1]);
         if (count==3)
-		{
-		   result->uExpression.sOperation.arg2 = getExpressionFromString(pStrings[2]);
-		}
+        {
+           result->uExpression.sOperation.arg2 = getExpressionFromString(pStrings[2]);
+        }
         else
             result->uExpression.sOperation.arg2 = NULL;
         if (result->uExpression.sOperation.arg1 == NULL)
@@ -649,28 +643,66 @@ static struct Expression* getExpressionFromString(char* input)
 }
 
 /*----------------------------------------------------------------------------*/
-static void printExpression(struct Expression* pExpr)
+static size_t getExpressionLength(struct Expression* pExpr)
 {
+  size_t result;
   if (pExpr==NULL)
-  {
-    printf("ERROR: null pointer in printExpression\n");
-    return;
-  }
+    return 0;
   if (pExpr->type == EXPR_SINGLE)
   {
     if (pExpr->uExpression.sArgument.type == VARIABLE_X)
-      printf("x");
+    {
+      return 2;
+    }
+    if (pExpr->uExpression.sArgument.type == CONSTANT_VALUE)
+    {
+      return 12;
+    }
+  }
+  if (pExpr->type == EXPR_OPERATION)
+  {
+    result = 8;
+	result += getExpressionLength(pExpr->uExpression.sOperation.arg1);
+	result += getExpressionLength(pExpr->uExpression.sOperation.arg2);
+	return result;
+  }
+  return 0;
+}
+
+static char* printExpression(struct Expression* pExpr)
+{
+  int n;
+  char *result, *temp, *arg;
+  result = (char*)Malloc(getExpressionLength(pExpr)+1);
+  if (result==NULL)
+	return NULL;
+  if (pExpr==NULL)
+  {
+    printf("ERROR: null pointer in printExpression\n");
+  }
+  temp = result;
+  if (pExpr->type == EXPR_SINGLE)
+  {
+    if (pExpr->uExpression.sArgument.type == VARIABLE_X)
+	{
+      n = sprintf(temp,"x");
+	  temp += n;
+	}
     else
     {
       if (pExpr->uExpression.sArgument.type == CONSTANT_VALUE)
       {
         if (pExpr->uExpression.sArgument.uArgument.sConstant.type == CONST_INT)
-          printf("%i",pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.intValue);
+		{
+          n = sprintf(temp,"%i",pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.intValue);
+		  temp += n;
+		}
         else
         {
           if (pExpr->uExpression.sArgument.uArgument.sConstant.type == CONST_FLOAT)
           {
-            printf("%f",pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue);
+            n = sprintf(temp,"%f",pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue);
+			temp += n;
           }
           else
           {
@@ -684,54 +716,76 @@ static void printExpression(struct Expression* pExpr)
   {
     if (pExpr->type == EXPR_OPERATION)
     {
-      printf("(");
+      n = sprintf(temp,"(");
+	  temp += n;
       switch (pExpr->uExpression.sOperation.opcode)
       {
         case OPCODE_PLUS:
-          printf("+");
+          n = sprintf(temp,"+");
+		  temp += n;
         break;
         case OPCODE_MINUS:
-          printf("-");
+          n = sprintf(temp,"-");
+		  temp += n;
         break;
         case OPCODE_MULTIPLY:
-          printf("*");
+          n = sprintf(temp,"*");
+		  temp += n;
         break;
         case OPCODE_DIVIDE:
-          printf("/");
+          n = sprintf(temp,"/");
+		  temp += n;
         break;
         case OPCODE_POWER:
-          printf("^");
+          n = sprintf(temp,"^");
+		  temp += n;
         break;
         case OPCODE_SIN:
-          printf("sin");
+          n = sprintf(temp,"sin");
+		  temp += n;
         break;
         case OPCODE_COS:
-          printf("cos");
+          n = sprintf(temp,"cos");
+		  temp += n;
         break;
         case OPCODE_TAN:
-          printf("tan");
+          n = sprintf(temp,"tan");
+		  temp += n;
         break;
         case OPCODE_LN:
-          printf("ln");
+          n = sprintf(temp,"ln");
+		  temp += n;
         break;
         default:
           printf("ERROR: not an operation %i\n",pExpr->uExpression.sOperation.opcode);
         break;
       }
-      printf(" ");
-      printExpression(pExpr->uExpression.sOperation.arg1);
+      n = sprintf(temp," ");
+	  temp += n;
+	  arg = printExpression(pExpr->uExpression.sOperation.arg1);
+	  n = strlen(arg);
+      memcpy(temp,arg,n);
+	  Free(arg);
+	  temp += n;
       if (pExpr->uExpression.sOperation.twoArgsRequired)
       {
-        printf(" ");
-        printExpression(pExpr->uExpression.sOperation.arg2);
+        n = sprintf(temp," ");
+	    temp += n;
+        arg = printExpression(pExpr->uExpression.sOperation.arg2);
+		n = strlen(arg);
+		memcpy(temp,arg,n);
+		Free(arg);
+		temp += n;
       }
-      printf(")");
+      n = sprintf(temp,")");
+	  temp += n;
     }
     else
     {
       printf("ERROR: not an operation neither a single, %i\n",pExpr->type);
     }
   }
+  return result;
 }
 
 /*----------------------------------------------------------------------------*/
@@ -1039,13 +1093,13 @@ static struct Expression* simplify(struct Expression* pExpr)
         {
           case OPCODE_PLUS:
             result = simplify(second);
-			deleteExpression(first);
-			deleteExpression(second);
-			return result;
+            deleteExpression(first);
+            deleteExpression(second);
+            return result;
           break;
           case OPCODE_MULTIPLY:
-		    deleteExpression(first);
-		    deleteExpression(second);
+            deleteExpression(first);
+            deleteExpression(second);
             return createIntConstant(0);
           break;
           default:
@@ -1059,13 +1113,13 @@ static struct Expression* simplify(struct Expression* pExpr)
           case OPCODE_PLUS:
           case OPCODE_MINUS:
             result = simplify(first);
-			deleteExpression(first);
-			deleteExpression(second);
-			return result;
+            deleteExpression(first);
+            deleteExpression(second);
+            return result;
           break;
           case OPCODE_MULTIPLY:
-		    deleteExpression(first);
-		    deleteExpression(second);
+            deleteExpression(first);
+            deleteExpression(second);
             return createIntConstant(0);
           break;
           case OPCODE_DIVIDE:
@@ -1082,13 +1136,13 @@ static struct Expression* simplify(struct Expression* pExpr)
         {
           case OPCODE_MULTIPLY:
             result = simplify(second);
-			deleteExpression(first);
-		    deleteExpression(second);
-			return result;
+            deleteExpression(first);
+            deleteExpression(second);
+            return result;
           break;
           case OPCODE_POWER:
-		    deleteExpression(first);
-		    deleteExpression(second);
+            deleteExpression(first);
+            deleteExpression(second);
             return createIntConstant(1);
           break;
           default:
@@ -1103,9 +1157,9 @@ static struct Expression* simplify(struct Expression* pExpr)
           case OPCODE_DIVIDE:
           case OPCODE_POWER:
             result = simplify(first);
-			deleteExpression(first);
-		    deleteExpression(second);
-			return result;
+            deleteExpression(first);
+            deleteExpression(second);
+            return result;
           break;
           default:
           break;
@@ -1118,32 +1172,32 @@ static struct Expression* simplify(struct Expression* pExpr)
         {
           intA = first->uExpression.sArgument.uArgument.sConstant.uConstant.intValue;
           intB = second->uExpression.sArgument.uArgument.sConstant.uConstant.intValue;
-		  deleteExpression(first);
-		  deleteExpression(second);
+          deleteExpression(first);
+          deleteExpression(second);
           return getIntOperation(intA, intB, opcode);
         }
         if ((first->uExpression.sArgument.type = CONST_INT)&&(second->uExpression.sArgument.uArgument.sConstant.type = CONST_FLOAT))
         {
           floatA = (float)first->uExpression.sArgument.uArgument.sConstant.uConstant.intValue;
           floatB = second->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue;
-		  deleteExpression(first);
-		  deleteExpression(second);
+          deleteExpression(first);
+          deleteExpression(second);
           return getFloatOperation(floatA, floatB, opcode);
         }
         if ((first->uExpression.sArgument.uArgument.sConstant.type = CONST_FLOAT)&&(second->uExpression.sArgument.uArgument.sConstant.type = CONST_INT))
         {
           floatA = first->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue;
           floatB = (float)second->uExpression.sArgument.uArgument.sConstant.uConstant.intValue;
-		  deleteExpression(first);
-		  deleteExpression(second);
+          deleteExpression(first);
+          deleteExpression(second);
           return getFloatOperation(floatA, floatB, opcode);
         }
         if ((first->uExpression.sArgument.uArgument.sConstant.type = CONST_FLOAT)&&(second->uExpression.sArgument.uArgument.sConstant.type = CONST_FLOAT))
         {
           floatA = first->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue;
           floatB = second->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue;
-		  deleteExpression(first);
-		  deleteExpression(second);
+          deleteExpression(first);
+          deleteExpression(second);
           return getFloatOperation(floatA, floatB, opcode);
         }
         printf("ERROR: unexpected 1 in symplifyBinaryOperation\n");
@@ -1155,18 +1209,18 @@ static struct Expression* simplify(struct Expression* pExpr)
         switch (opcode)
         {
           case OPCODE_PLUS:
-		    deleteExpression(first);
-	        deleteExpression(second);
+            deleteExpression(first);
+            deleteExpression(second);
             return createOperation(OPCODE_MULTIPLY,createVariableX(),createIntConstant(2));
           break;
           case OPCODE_MULTIPLY:
-		    deleteExpression(first);
-	        deleteExpression(second);
+            deleteExpression(first);
+            deleteExpression(second);
             return createOperation(OPCODE_POWER,createVariableX(),createIntConstant(2));
           break;
           case OPCODE_MINUS:
-		    deleteExpression(first);
-	        deleteExpression(second);
+            deleteExpression(first);
+            deleteExpression(second);
             return createIntConstant(0);
           break;
           default:
@@ -1177,9 +1231,9 @@ static struct Expression* simplify(struct Expression* pExpr)
       }
       /*------------ generic situation ---------------*/
       result = createOperation(opcode,copyExpression(first),copyExpression(second));
-	  deleteExpression(first);
-	  deleteExpression(second);
-	  return result;
+      deleteExpression(first);
+      deleteExpression(second);
+      return result;
     }
   }
   printf("ERROR: invalid type %i in simplify\n",pExpr->type);
@@ -1242,7 +1296,7 @@ static struct Expression* createOperation(int opcode, struct Expression* arg1, s
 static struct Expression* differentiate(struct Expression* pExpr)
 {
   int opcode;
-  struct Expression* first, *second;
+  struct Expression* first, *second, *result, *final;
   if (pExpr==NULL)
     return NULL;
   if (pExpr->type == EXPR_SINGLE)
@@ -1265,17 +1319,17 @@ static struct Expression* differentiate(struct Expression* pExpr)
     {
       case OPCODE_PLUS:
       case OPCODE_MINUS:
-        return createOperation(opcode,differentiate(first),differentiate(second));
+        result = createOperation(opcode,differentiate(first),differentiate(second));
       break;
       case OPCODE_MULTIPLY:
-        return createOperation(
+        result = createOperation(
                                OPCODE_PLUS,
                                createOperation(OPCODE_MULTIPLY, copyExpression(first), differentiate(second)),
                                createOperation(OPCODE_MULTIPLY, differentiate(first),  copyExpression(second))
                               );
       break;
       case OPCODE_DIVIDE:
-        return createOperation(
+        result = createOperation(
                                OPCODE_DIVIDE,
                                createOperation(
                                                OPCODE_MINUS,
@@ -1284,9 +1338,10 @@ static struct Expression* differentiate(struct Expression* pExpr)
                                                ),
                                createOperation(OPCODE_POWER,copyExpression(second),createIntConstant(2))
                               );
+                              
       break;
       case OPCODE_POWER:
-        return createOperation(
+        result = createOperation(
                                OPCODE_MULTIPLY,
                                createOperation(OPCODE_POWER,copyExpression(first),copyExpression(second)),
                                createOperation(
@@ -1305,14 +1360,14 @@ static struct Expression* differentiate(struct Expression* pExpr)
                               );
       break;
       case OPCODE_SIN:
-        return createOperation(
+        result = createOperation(
                                OPCODE_MULTIPLY,
                                createOperation(OPCODE_COS,copyExpression(first),NULL),
                                differentiate(first)
                                );
       break;
       case OPCODE_COS:
-        return createOperation(
+        result = createOperation(
                               OPCODE_MULTIPLY,
                               createOperation(
                                               OPCODE_MULTIPLY,
@@ -1323,7 +1378,7 @@ static struct Expression* differentiate(struct Expression* pExpr)
                               );
       break;
       case OPCODE_TAN:
-        return createOperation(
+        result = createOperation(
                                OPCODE_MULTIPLY,
                                createOperation(
                                                OPCODE_PLUS,
@@ -1338,13 +1393,16 @@ static struct Expression* differentiate(struct Expression* pExpr)
                               );
       break;
       case OPCODE_LN:
-        return createOperation(OPCODE_DIVIDE,differentiate(first),copyExpression(first));
+        result = createOperation(OPCODE_DIVIDE,differentiate(first),copyExpression(first));
       break;
       default:
         printf("ERROR: unhandled opcode %i in createOperation\n",opcode);
         return NULL;
       break;
     }
+    final = simplify(result);
+    deleteExpression(result);
+    return final;
   }
   printf("ERROR: unexpected type %i in differentiate\n",pExpr->type);
   return NULL;
@@ -1354,30 +1412,28 @@ static struct Expression* differentiate(struct Expression* pExpr)
 
 int main(int argc, char* argv[])
 {
-  int n,c;
-  char s[]="(+ (sin x) (/ x (+ 2 x)))";
-  char** p;
-  int i;
+  char* output;
+  char s[]="(^ x 2)";
   struct Expression* pExp, *diff, *diff2, *final;
-  
+
   pExp  = getExpressionFromString(s);
-  diff = differentiate(pExp);
+  diff  = differentiate(pExp);
   
-  final = simplify(diff);
   
   printf("----------------------------------------------------------------------------------\n");
-  printExpression(pExp);
-  printf("\n");
-  printf("----------------------------------------------------------------------------------\n");
-  printExpression(diff);
-  printf("\n");
-  printf("----------------------------------------------------------------------------------\n");
-  printExpression(final);
-  printf("\n");
-  deleteExpression(final);
+  output = printExpression(pExp);
+  printf("Expression: %s\n",output);
+  Free(output);
+
   
-  deleteExpression(diff);
+  output = printExpression(diff);
+  printf("\nDiff: %s\n",output);
+  Free(output);
+  
   deleteExpression(pExp);
+  deleteExpression(diff);
+  
+  printf("\nmallocCalls == %i\n",mallocCalls);
   
   return 0;
 }
