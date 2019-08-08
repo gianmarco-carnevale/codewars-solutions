@@ -539,7 +539,7 @@ static char** parseExpression(const char* input)
 }
 
 /*----------------------------------------------------------------------------*/
-static struct Expression* getExpressionFromString(char* input)
+static struct Expression* getExpressionFromString(const char* input)
 {
   struct Expression* result;
   char** pStrings;
@@ -678,8 +678,8 @@ static size_t getExpressionLength(struct Expression* pExpr)
 
 static char* printExpression(struct Expression* pExpr)
 {
-  int n;
   char *result, *temp, *arg;
+  int n;
   result = (char*)Malloc(getExpressionLength(pExpr)+1);
   if (result==NULL)
     return NULL;
@@ -713,7 +713,7 @@ static char* printExpression(struct Expression* pExpr)
           }
           else
           {
-            printf("ERROR: invalid type %i in printExpression\n");
+            printf("ERROR: invalid type %i in printExpression\n",pExpr->uExpression.sArgument.uArgument.sConstant.type);
           }
         }
       }
@@ -1126,18 +1126,18 @@ static struct Expression* simplify(struct Expression* pExpr)
   if (pExpr->type == EXPR_SINGLE)
   {
     if (isConstant(pExpr))
-	{
-	  if (pExpr->uExpression.sArgument.uArgument.sConstant.type == CONST_FLOAT)
-	  {
-	    floatA = pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue;
-		intA = (int)floatA;
-		if ((float)intA == floatA)
-		{
-		  return createIntConstant(intA);
-		}
-	  }
-	}
-	return copyExpression(pExpr);
+  	{
+  	  if (pExpr->uExpression.sArgument.uArgument.sConstant.type == CONST_FLOAT)
+  	  {
+  	    floatA = pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue;
+  		  intA = (int)floatA;
+    		if ((float)intA == floatA)
+    		{
+    		  return createIntConstant(intA);
+    		}
+  	  }
+  	}
+  	return copyExpression(pExpr);
   }
   if (pExpr->type == EXPR_OPERATION)
   {
@@ -1152,12 +1152,35 @@ static struct Expression* simplify(struct Expression* pExpr)
            printf("ERROR: logarithm of a non positive number in simplify\n");
            return NULL;
         }
+        if (isConstant(first) && isOne(first))
+        {
+          deleteExpression(first);
+          return createIntConstant(0);
+        }
+      }
+      if (pExpr->uExpression.sOperation.opcode == OPCODE_EXP)
+      {
+        if (isConstant(first) && isZero(first))
+        {
+          deleteExpression(first);
+          return createIntConstant(1);
+        }
       }
       return createOperation(opcode,first,NULL);
     }
     else
     {
       second = simplify(pExpr->uExpression.sOperation.arg2);
+      if (!isConstant(first) && isConstant(second))
+      {
+        if ((opcode==OPCODE_PLUS)||(opcode==OPCODE_MULTIPLY))
+        {
+          result = createOperation(opcode,copyExpression(second),copyExpression(first));
+          deleteExpression(first);
+          deleteExpression(second);
+          return simplify(result);
+        }
+      }
       /*-----------------------------------------------------------------*/
       if (isConstant(first) && isZero(first))
       {
@@ -1412,7 +1435,7 @@ static struct Expression* differentiate(struct Expression* pExpr)
                                                ),
                                createOperation(OPCODE_POWER,copyExpression(second),createIntConstant(2))
                               );
-                              
+
       break;
       case OPCODE_POWER:
         result = createOperation(
@@ -1485,31 +1508,85 @@ static struct Expression* differentiate(struct Expression* pExpr)
   return NULL;
 }
 
+char* diff (const char* input)
+{
+  struct Expression *pExpr, *differentiated;
+  char* result;
+  pExpr = getExpressionFromString(input);
+  differentiated = differentiate(pExpr);
+  result = printExpression(differentiated);
+  deleteExpression(pExpr);
+  deleteExpression(differentiated);
+  return result;
+}
+
+#if 0
+Test (test_cases, sample_tests_1) {
+
+  const char *s = diff ("(tan x)");
+  cr_assert (!strcmp (s, "(+ 1 (^ (tan x) 2))") || !strcmp (s, "(^ (cos x) -2)") || !strcmp (s, "(/ 1 (^ (cos x) 2))"), "diff (tan x) incorrect");
+}
+
+Test (test_cases, sample_tests_2) {
+  diffShouldBe ("(+ x (+ x x))", "3");
+  diffShouldBe ("(- (+ x x) x)", "1");
+  diffShouldBe ("(* 2 (+ x 2))", "2");
+  diffShouldBe ("(/ 2 (+ 1 x))", "(/ -2 (^ (+ 1 x) 2))");
+  diffShouldBe ("(cos (+ x 1))", "(* -1 (sin (+ x 1)))");
+  diffShouldBe ("(sin (+ x 1))", "(cos (+ x 1))");
+  diffShouldBe ("(sin (* 2 x))", "(* 2 (cos (* 2 x)))");
+  diffShouldBe ("(exp (* 2 x))", "(* 2 (exp (* 2 x)))");
+  const char *s = diff("(tan (* 2 x))");
+  cr_assert (!strcmp (s, "(* 2 (+ 1 (^ (tan (* 2 x)) 2)))") || !strcmp (s, "(* 2 (^ (cos (* 2 x)) -2))") || !strcmp (s, "(/ 2 (^ (cos (* 2 x)) 2))"), "diff (tan (* 2 x)) incorrect");
+}
+
+Test (test_cases, second_derivatives) {
+  diff2ShouldBe ("(sin x)", "(* -1 (sin x))");
+  diff2ShouldBe ("(exp x)", "(exp x)");
+  const char *s = diff (diff ("(^ x 3)"));
+  cr_assert (!strcmp (s, "(* 3 (* 2 x))") || !strcmp (s, "(* 6 x)"), "diff (diff (^ x 3)) incorrect");
+}
+#endif
+
+
+void diffShouldBe (char *input, char *expected) {
+  const char *result = diff (input);
+  if (strcmp(expected,result))
+    printf ("diff (%s) should be %s, got %s\n", input, expected, result);
+
+}
+
+void diff2ShouldBe (char *input, char *expected) {
+  const char *result = diff (diff (input));
+  if (strcmp(expected,result))
+    printf ("diff (diff (%s)) should be %s, got %s\n", input, expected, result);
+
+}
+
 
 int main(int argc, char* argv[])
 {
-  char* output;
-  char s[]="(* x (* x x))";
-  struct Expression* pExp, *diff, *diff2, *final;
+  diffShouldBe ("5", "0");
+  diffShouldBe ("x", "1");
+  diffShouldBe ("(+ x x)", "2");
+  diffShouldBe ("(- x x)", "0");
+  diffShouldBe ("(* x 2)", "2");
+  diffShouldBe ("(/ x 2)", "0.5");
+  diffShouldBe ("(^ x 2)", "(* 2 x)");
+  diffShouldBe ("(cos x)", "(* -1 (sin x))");
+  diffShouldBe ("(sin x)", "(cos x)");
+  diffShouldBe ("(exp x)", "(exp x)");
+  diffShouldBe ("(ln x)", "(/ 1 x)");
+  diffShouldBe ("(+ x (+ x x))", "3");
+  diffShouldBe ("(- (+ x x) x)", "1");
+  diffShouldBe ("(* 2 (+ x 2))", "2");
+  diffShouldBe ("(/ 2 (+ 1 x))", "(/ -2 (^ (+ 1 x) 2))");
+  diffShouldBe ("(cos (+ x 1))", "(* -1 (sin (+ x 1)))");
+  diffShouldBe ("(sin (+ x 1))", "(cos (+ x 1))");
+  diffShouldBe ("(sin (* 2 x))", "(* 2 (cos (* 2 x)))");
+  diffShouldBe ("(exp (* 2 x))", "(* 2 (exp (* 2 x)))");
 
-  pExp  = getExpressionFromString(s);
-  diff  = differentiate(pExp);
-  
-  
-  printf("----------------------------------------------------------------------------------\n");
-  output = printExpression(pExp);
-  printf("Expression: %s\n",output);
-  Free(output);
-
-  
-  output = printExpression(diff);
-  printf("\nDiff: %s\n",output);
-  Free(output);
-  
-  deleteExpression(pExp);
-  deleteExpression(diff);
-  
   printf("\nmallocCalls == %i\n",mallocCalls);
-  
+
   return 0;
 }
