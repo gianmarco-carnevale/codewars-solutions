@@ -644,9 +644,9 @@ static void printExpression(struct Expression* pExpr)
             printf("%f",pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue);
           }
           else
-		  {
-			printf("ERROR: invalid type %i in printExpression\n");
-		  }
+          {
+            printf("ERROR: invalid type %i in printExpression\n");
+          }
         }
       }
     }
@@ -689,13 +689,13 @@ static void printExpression(struct Expression* pExpr)
           printf("ERROR: not an operation %i\n",pExpr->uExpression.sOperation.opcode);
         break;
       }
-	  printf(" ");
+      printf(" ");
       printExpression(pExpr->uExpression.sOperation.arg1);
       if (pExpr->uExpression.sOperation.twoArgsRequired)
-	  {
-	    printf(" ");
-		printExpression(pExpr->uExpression.sOperation.arg2);
-	  }
+      {
+        printf(" ");
+        printExpression(pExpr->uExpression.sOperation.arg2);
+      }
       printf(")");
     }
     else
@@ -953,243 +953,14 @@ static struct Expression* getFloatOperation(float a, float b, int opcode)
   }
 }
 /*----------------------------------------------------------------------------*/
-static struct Expression* simplify(struct Expression* pExpr);
-static struct Expression* simplifyBinaryOperation(struct Expression* first, struct Expression* second, int opcode)
-{
-  struct Expression* result, *temp;
-  int intA, intB;
-  float floatA, floatB;
-  /*-----------------------------------------------------------------*/
-  if (isConstant(first) && isZero(first))
-  {
-    switch (opcode)
-    {
-      case OPCODE_PLUS:
-        return simplify(second);
-      break;
-      case OPCODE_MULTIPLY:
-        return createIntConstant(0);
-      break;
-      default:
-      break;
-    }
-  }
-  if (isConstant(second) && isZero(second))
-  {
-    switch (opcode)
-    {
-      case OPCODE_PLUS:
-      case OPCODE_MINUS:
-        return simplify(first);
-      break;
-      case OPCODE_MULTIPLY:
-        return createIntConstant(0);
-      break;
-      case OPCODE_DIVIDE:
-        printf("ERROR: division by zero\n");
-        return NULL;
-      break;
-      default:
-      break;
-    }
-  }
-  if (isConstant(first) && isOne(first))
-  {
-    switch (opcode)
-    {
-      case OPCODE_MULTIPLY:
-        return simplify(second);
-      break;
-      case OPCODE_POWER:
-        return createIntConstant(1);
-      break;
-      default:
-      break;
-    }
-  }
-  if (isConstant(second) && isOne(second))
-  {
-    switch (opcode)
-    {
-      case OPCODE_MULTIPLY:
-      case OPCODE_DIVIDE:
-      case OPCODE_POWER:
-        return simplify(first);
-      break;
-      default:
-      break;
-    }
-  }
-  /*------------ both expressions are constant values ---------------*/
-  if ((isConstant(first)) && (isConstant(second)))
-  {
-    if ((first->uExpression.sArgument.type = CONST_INT)&&(second->uExpression.sArgument.uArgument.sConstant.type = CONST_INT))
-    {
-      intA = first->uExpression.sArgument.uArgument.sConstant.uConstant.intValue;
-      intB = second->uExpression.sArgument.uArgument.sConstant.uConstant.intValue;
-      return getIntOperation(intA, intB, opcode);
-    }
-    if ((first->uExpression.sArgument.type = CONST_INT)&&(second->uExpression.sArgument.uArgument.sConstant.type = CONST_FLOAT))
-    {
-      floatA = (float)first->uExpression.sArgument.uArgument.sConstant.uConstant.intValue;
-      floatB = second->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue;
-      return getFloatOperation(floatA, floatB, opcode);
-    }
-    if ((first->uExpression.sArgument.uArgument.sConstant.type = CONST_FLOAT)&&(second->uExpression.sArgument.uArgument.sConstant.type = CONST_INT))
-    {
-      floatA = first->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue;
-      floatB = (float)second->uExpression.sArgument.uArgument.sConstant.uConstant.intValue;
-      return getFloatOperation(floatA, floatB, opcode);
-    }
-    if ((first->uExpression.sArgument.uArgument.sConstant.type = CONST_FLOAT)&&(second->uExpression.sArgument.uArgument.sConstant.type = CONST_FLOAT))
-    {
-      floatA = first->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue;
-      floatB = second->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue;
-      return getFloatOperation(floatA, floatB, opcode);
-    }
-    printf("ERROR: unexpected 1 in symplifyBinaryOperation\n");
-    return NULL;
-  }
-  /*------------ both expressions are x variable ---------------*/
-  if ((isVariableX(first)) && (isVariableX(second)))
-  {
-    result = (struct Expression*)malloc(sizeof(struct Expression));
-    if (result==NULL)
-    {
-      printf("ERROR: malloc 1 in executeBinaryOperation\n");
-      return NULL;
-    }
-    switch (opcode)
-    {
-      case OPCODE_PLUS:
-        result->type = EXPR_OPERATION;
-        result->uExpression.sOperation.opcode = OPCODE_MULTIPLY;
-        result->uExpression.sOperation.twoArgsRequired = 1;
-        result->uExpression.sOperation.arg1 = createVariableX();
-        result->uExpression.sOperation.arg2 = createIntConstant(2);
-        return result;
-      break;
-      case OPCODE_MULTIPLY:
-        result->type = EXPR_OPERATION;
-        result->uExpression.sOperation.opcode = OPCODE_POWER;
-        result->uExpression.sOperation.twoArgsRequired = 1;
-        result->uExpression.sOperation.arg1 = createVariableX();
-        result->uExpression.sOperation.arg2 = createIntConstant(2);
-        return result;
-      break;
-      case OPCODE_MINUS:
-	    free(result);
-        result = createIntConstant(0);
-		return result;
-      break;
-      /*
-      case OPCODE_DIVIDE:
-      case OPCODE_POWER:
-        result->type = EXPR_OPERATION;
-        result->uExpression.sOperation.opcode = opcode;
-        result->uExpression.sOperation.twoArgsRequired = 1;
-        result->uExpression.sOperation.arg1 = createVariableX();
-        result->uExpression.sOperation.arg2 = createVariableX();
-        return result;
-      break;
-      */
-      default:
-        printf("ERROR: unhandled opcode %i in executeBinaryOperation (both x)\n",opcode);
-        free(result);
-        return NULL;
-      break;
-    }
-  }
-  /*------------ x and a constant ---------------*/
-  if ((isConstant(first)) && isVariableX(second))
-  {
-    temp = first;
-    first = second;
-    second = temp;
-  }
-  if ((isVariableX(first)) && (isConstant(second)))
-  {
-    if (isZero(second))
-    {
-      switch (opcode)
-      {
-        case OPCODE_PLUS:
-        case OPCODE_MINUS:
-          result = createVariableX();
-          return result;
-        break;
-        case OPCODE_MULTIPLY:
-          result = createIntConstant(0);
-          return result;
-        break;
-        case OPCODE_DIVIDE:
-          printf("ERROR: division by zero\n");
-          return NULL;
-        break;
-        case OPCODE_POWER:
-          result = createIntConstant(1);
-          return result;
-        break;
-        default:
-          printf("ERROR: unhandled opcode %i in executeBinaryOperation (x and zero)\n",opcode);
-          return NULL;
-        break;
-      }
-    }
-    if (isOne(second))
-    {
-      switch (opcode)
-      {
-        case OPCODE_PLUS:
-        case OPCODE_MINUS:
-          result = (struct Expression*)malloc(sizeof(struct Expression));
-          if (result==NULL)
-          {
-            printf("ERROR: malloc 2 in executeBinaryOperation\n");
-            return NULL;
-          }
-          result->type = EXPR_OPERATION;
-          result->uExpression.sOperation.opcode = opcode;
-          result->uExpression.sOperation.twoArgsRequired = 1;
-          result->uExpression.sOperation.arg1 = createVariableX();
-          result->uExpression.sOperation.arg2 = createIntConstant(1);
-          return result;
-        break;
-        case OPCODE_MULTIPLY:
-        case OPCODE_DIVIDE:
-        case OPCODE_POWER:
-          result = createVariableX();
-          return result;
-        break;
-        default:
-          printf("ERROR: unhandled opcode %i in executeBinaryOperation (x and one)\n",opcode);
-          free(result);
-          return NULL;
-        break;
-      }
-    }
-  }
-  /*------------ generic situation ---------------*/
-  result = (struct Expression*)malloc(sizeof(struct Expression));
-  if (result==NULL)
-  {
-    printf("ERROR: malloc 3 in executeBinaryOperation\n");
-    return NULL;
-  }
-  result->type = EXPR_OPERATION;
-  result->uExpression.sOperation.opcode = opcode;
-  result->uExpression.sOperation.twoArgsRequired = 1;
-  result->uExpression.sOperation.arg1 = copyExpression(first);
-  result->uExpression.sOperation.arg2 = copyExpression(second);
-  return result;
-}
-
+static struct Expression* createOperation(int opcode, struct Expression* arg1, struct Expression* arg2);
 
 static struct Expression* simplify(struct Expression* pExpr)
 {
-  struct Expression* result;
-  struct Expression* arg1, *arg2;
-  int opcode;
+  struct Expression *first, *second, *result;
+  int opcode, intA, intB;
+  float floatA, floatB;
+  /*-----------------------------------------------------------------*/
   if (pExpr==NULL)
   {
     printf("ERROR: null pointer in simplify\n");
@@ -1201,34 +972,136 @@ static struct Expression* simplify(struct Expression* pExpr)
   }
   if (pExpr->type == EXPR_OPERATION)
   {
-    if (pExpr->uExpression.sOperation.twoArgsRequired)
+    opcode = pExpr->uExpression.sOperation.opcode;
+    first = simplify(pExpr->uExpression.sOperation.arg1);
+    if (pExpr->uExpression.sOperation.twoArgsRequired==0)
     {
-       arg1 = simplify(pExpr->uExpression.sOperation.arg1);
-       arg2 = simplify(pExpr->uExpression.sOperation.arg2);
-       opcode = pExpr->uExpression.sOperation.opcode;
-       return simplifyBinaryOperation(arg1,arg2,opcode);
-    }
-    else
-    {
-      arg1 = simplify(pExpr->uExpression.sOperation.arg1);
       if (pExpr->uExpression.sOperation.opcode == OPCODE_LN)
       {
-        if (isZeroOrNegative(arg1))
+        if (isZeroOrNegative(first))
         {
            printf("ERROR: logarithm of a non positive number in simplify\n");
            return NULL;
         }
       }
-      result = (struct Expression*)malloc(sizeof(struct Expression));
-      if (result==NULL)
+      return createOperation(opcode,first,NULL);
+    }
+    else
+    {
+      second = simplify(pExpr->uExpression.sOperation.arg2);
+      /*-----------------------------------------------------------------*/
+      if (isConstant(first) && isZero(first))
       {
-        printf("ERROR: malloc in simplify\n");
+        switch (opcode)
+        {
+          case OPCODE_PLUS:
+            return simplify(second);
+          break;
+          case OPCODE_MULTIPLY:
+            return createIntConstant(0);
+          break;
+          default:
+          break;
+        }
+      }
+      if (isConstant(second) && isZero(second))
+      {
+        switch (opcode)
+        {
+          case OPCODE_PLUS:
+          case OPCODE_MINUS:
+            return simplify(first);
+          break;
+          case OPCODE_MULTIPLY:
+            return createIntConstant(0);
+          break;
+          case OPCODE_DIVIDE:
+            printf("ERROR: division by zero\n");
+            return NULL;
+          break;
+          default:
+          break;
+        }
+      }
+      if (isConstant(first) && isOne(first))
+      {
+        switch (opcode)
+        {
+          case OPCODE_MULTIPLY:
+            return simplify(second);
+          break;
+          case OPCODE_POWER:
+            return createIntConstant(1);
+          break;
+          default:
+          break;
+        }
+      }
+      if (isConstant(second) && isOne(second))
+      {
+        switch (opcode)
+        {
+          case OPCODE_MULTIPLY:
+          case OPCODE_DIVIDE:
+          case OPCODE_POWER:
+            return simplify(first);
+          break;
+          default:
+          break;
+        }
+      }
+      /*------------ both expressions are constant values ---------------*/
+      if ((isConstant(first)) && (isConstant(second)))
+      {
+        if ((first->uExpression.sArgument.type = CONST_INT)&&(second->uExpression.sArgument.uArgument.sConstant.type = CONST_INT))
+        {
+          intA = first->uExpression.sArgument.uArgument.sConstant.uConstant.intValue;
+          intB = second->uExpression.sArgument.uArgument.sConstant.uConstant.intValue;
+          return getIntOperation(intA, intB, opcode);
+        }
+        if ((first->uExpression.sArgument.type = CONST_INT)&&(second->uExpression.sArgument.uArgument.sConstant.type = CONST_FLOAT))
+        {
+          floatA = (float)first->uExpression.sArgument.uArgument.sConstant.uConstant.intValue;
+          floatB = second->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue;
+          return getFloatOperation(floatA, floatB, opcode);
+        }
+        if ((first->uExpression.sArgument.uArgument.sConstant.type = CONST_FLOAT)&&(second->uExpression.sArgument.uArgument.sConstant.type = CONST_INT))
+        {
+          floatA = first->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue;
+          floatB = (float)second->uExpression.sArgument.uArgument.sConstant.uConstant.intValue;
+          return getFloatOperation(floatA, floatB, opcode);
+        }
+        if ((first->uExpression.sArgument.uArgument.sConstant.type = CONST_FLOAT)&&(second->uExpression.sArgument.uArgument.sConstant.type = CONST_FLOAT))
+        {
+          floatA = first->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue;
+          floatB = second->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue;
+          return getFloatOperation(floatA, floatB, opcode);
+        }
+        printf("ERROR: unexpected 1 in symplifyBinaryOperation\n");
         return NULL;
       }
-      *result = *pExpr;
-      result->uExpression.sOperation.arg1 = arg1;
-      result->uExpression.sOperation.arg2 = NULL;
-      return result;
+      /*------------ both expressions are x variable ---------------*/
+      if ((isVariableX(first)) && (isVariableX(second)))
+      {
+        switch (opcode)
+        {
+          case OPCODE_PLUS:
+            return createOperation(OPCODE_MULTIPLY,createVariableX(),createIntConstant(2));
+          break;
+          case OPCODE_MULTIPLY:
+            return createOperation(OPCODE_POWER,createVariableX(),createIntConstant(2));
+          break;
+          case OPCODE_MINUS:
+            return createIntConstant(0);
+          break;
+          default:
+            printf("ERROR: unhandled opcode %i in executeBinaryOperation (both x)\n",opcode);
+            return NULL;
+          break;
+        }
+      }
+      /*------------ generic situation ---------------*/
+      return createOperation(opcode,copyExpression(first),copyExpression(second));
     }
   }
   printf("ERROR: invalid type %i in simplify\n",pExpr->type);
@@ -1241,38 +1114,38 @@ static struct Expression* createOperation(int opcode, struct Expression* arg1, s
   int twoArgs;
   if (arg1==NULL)
   {
-	printf("ERROR: arg1 is null\n");
-	return NULL;
+    printf("ERROR: arg1 is null\n");
+    return NULL;
   }
   switch (opcode)
   {
-	case OPCODE_PLUS:
-	case OPCODE_MINUS:
-	case OPCODE_MULTIPLY:
-	case OPCODE_DIVIDE:
-	case OPCODE_POWER:
-	  twoArgs=1;
-	  if (arg2==NULL)
-	  {
-	    printf("ERROR: arg2 is null\n");
-	    return NULL;
-	  }
-	break;
-	case OPCODE_SIN:
-	case OPCODE_COS:
-	case OPCODE_TAN:
-	case OPCODE_LN:
-	  twoArgs=0;
-	  if (arg2)
-	  {
-	    printf("ERROR: unexpected second argument\n");
-		return NULL;
-	  }
-	break;
-	default:
-	  printf("ERROR: unhandled opcode %i in createOperation\n",opcode);
-	  return NULL;
-	break;
+    case OPCODE_PLUS:
+    case OPCODE_MINUS:
+    case OPCODE_MULTIPLY:
+    case OPCODE_DIVIDE:
+    case OPCODE_POWER:
+      twoArgs=1;
+      if (arg2==NULL)
+      {
+        printf("ERROR: arg2 is null\n");
+        return NULL;
+      }
+    break;
+    case OPCODE_SIN:
+    case OPCODE_COS:
+    case OPCODE_TAN:
+    case OPCODE_LN:
+      twoArgs=0;
+      if (arg2!=NULL)
+      {
+        printf("ERROR: unexpected second argument\n");
+        return NULL;
+      }
+    break;
+    default:
+      printf("ERROR: unhandled opcode %i in createOperation\n",opcode);
+      return NULL;
+    break;
   }
   result = (struct Expression*)malloc(sizeof(struct Expression));
   if (result==NULL)
@@ -1283,13 +1156,15 @@ static struct Expression* createOperation(int opcode, struct Expression* arg1, s
   result->type = EXPR_OPERATION;
   result->uExpression.sOperation.opcode = opcode;
   result->uExpression.sOperation.twoArgsRequired = twoArgs;
-  result->uExpression.sOperation.arg1 = arg1
+  result->uExpression.sOperation.arg1 = arg1;
   result->uExpression.sOperation.arg2 = arg2;
   return result;
 }
 
 static struct Expression* derivate(struct Expression* pExpr)
 {
+  int opcode;
+  struct Expression* first, *second;
   if (pExpr==NULL)
     return NULL;
   if (pExpr->type == EXPR_SINGLE)
@@ -1305,7 +1180,47 @@ static struct Expression* derivate(struct Expression* pExpr)
   }
   if (pExpr->type == EXPR_OPERATION)
   {
+    opcode = pExpr->uExpression.sOperation.opcode;
+	first =  pExpr->uExpression.sOperation.arg1;
+	second = pExpr->uExpression.sOperation.arg2;
+    switch (opcode)
+    {
+      case OPCODE_PLUS:
+	  case OPCODE_MINUS:
+	    return createOperation(opcode,derivate(first),derivate(second));
+	  break;
+      case OPCODE_MULTIPLY:
+	    return createOperation(
+		                       OPCODE_PLUS,
+							   createOperation(OPCODE_MULTIPLY,   first,           derivate(second)),
+							   createOperation(OPCODE_MULTIPLY,   derivate(first), second)
+							  );
+	  break;
+      case OPCODE_DIVIDE:
+	    return createOperation(
+		                       OPCODE_DIVIDE,
+							   createOperation(
+							                   OPCODE_MINUS,
+							                   createOperation(OPCODE_MULTIPLY,derivate(first),second),
+											   createOperation(OPCODE_MULTIPLY,first,derivate(second))
+											   ),
+							   createOperation(OPCODE_POWER,second,createIntConstant(2))
+							  );
+	  break;
+      case OPCODE_POWER:
+ 
+      break;
+      case OPCODE_SIN:
+      case OPCODE_COS:
+      case OPCODE_TAN:
+      case OPCODE_LN:
 
+      break;
+      default:
+        printf("ERROR: unhandled opcode %i in createOperation\n",opcode);
+        return NULL;
+      break;
+    }
   }
   printf("ERROR: unexpected type %i in derivate\n",pExpr->type);
   return NULL;
