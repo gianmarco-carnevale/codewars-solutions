@@ -7,12 +7,12 @@
 struct Constant;
 struct VariableX;
 struct Argument;
-struct Expression;
 struct Operation;
+struct Expression;
 /*-------------------------*/
-union ExpressionUnion;
-union ArgumentUnion;
 union ConstantUnion;
+union ArgumentUnion;
+union ExpressionUnion;
 /*----------------------------------------------------------------------------*/
 #define CONST_INT        1
 #define CONST_FLOAT      2
@@ -40,29 +40,34 @@ union ConstantUnion
   float floatValue;
 };
 
+/*--------------------------*/
 struct Constant
 {
   int type;
   union ConstantUnion uConstant;
 };
 
+/*--------------------------*/
 struct VariableX
 {
   int _not_used;
 };
 
+/*--------------------------*/
 union ArgumentUnion
 {
   struct Constant  sConstant;
   struct VariableX _x_not_used;
 };
 
+/*--------------------------*/
 struct Argument
 {
   int type;
   union ArgumentUnion uArgument;
 };
 
+/*--------------------------*/
 struct Operation
 {
   int opcode;
@@ -71,12 +76,14 @@ struct Operation
   struct Expression* arg2;
 };
 
+/*--------------------------*/
 union ExpressionUnion
 {
   struct Operation sOperation;
   struct Argument sArgument;
 };
 
+/*--------------------------*/
 struct Expression
 {
   int type;
@@ -143,6 +150,7 @@ static int getOperationFromString(char* input, struct Operation* pOperation)
   return -1;
 }
 
+/*----------------------------------------------------------------------------*/
 static int getSingleArgumentFromString(char* input, struct Expression* pExpr)
 {
   int intConstant;
@@ -161,7 +169,6 @@ static int getSingleArgumentFromString(char* input, struct Expression* pExpr)
     pExpr->uExpression.sArgument.type = CONSTANT_VALUE;
     pExpr->uExpression.sArgument.uArgument.sConstant.type = CONST_INT;
     pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.intValue = intConstant;
-    printf("returning %i\n",intConstant);
     return 0;
   }
   floatConstant = strtod(input,&endPtr);
@@ -171,14 +178,13 @@ static int getSingleArgumentFromString(char* input, struct Expression* pExpr)
     pExpr->uExpression.sArgument.type = CONSTANT_VALUE;
     pExpr->uExpression.sArgument.uArgument.sConstant.type = CONST_FLOAT;
     pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue = floatConstant;
-    printf("returning %f\n",floatConstant);
     return 0;
   }
   printf("ERROR: failed to get constant from %s\n",input);
   return -1;
 }
 
-
+/*----------------------------------------------------------------------------*/
 #define ARG_STATE_AWAITING_ARGUMENT        0
 #define ARG_STATE_GATHERING_EXPRESSION     1
 #define ARG_STATE_AWAITING_BRACKET         2
@@ -198,12 +204,10 @@ static char** parseArguments(const char* input)
   }
   result[0]=NULL;
   result[1]=NULL;
-  printf("Info:%s\n",input);
   for (argId=0,length=0,state=ARG_STATE_AWAITING_ARGUMENT;;++input)
   switch (state)
   {
     case ARG_STATE_AWAITING_ARGUMENT:
-      printf("ARG_STATE_AWAITING_EXPRESSION:%s\n",input);
       switch (input[0])
       {
         case 0:
@@ -215,28 +219,27 @@ static char** parseArguments(const char* input)
           if (argumentString && (strlen(argumentString)>0))
           {
             result[argId] = argumentString;
-            printf("result[%i]=%s\n",argId,argumentString);
             ++argId;
             argumentString = NULL;
             if (input[0]==')')
             {
               state=ARG_STATE_AWAITING_END;
             }
-      			else
-      			{
-      			   if (argId>1)
-      			     state=ARG_STATE_AWAITING_BRACKET;
-      			   else
-      			     state = ARG_STATE_AWAITING_ARGUMENT;
-      			}
+                else
+                {
+                   if (argId>1)
+                     state=ARG_STATE_AWAITING_BRACKET;
+                   else
+                     state = ARG_STATE_AWAITING_ARGUMENT;
+                }
           }
-      		else
-      		{
-      		  if (input[0]==')')
-      			{
-      			  state=ARG_STATE_AWAITING_END;
-      			}
-      		}
+            else
+            {
+              if (input[0]==')')
+                {
+                  state=ARG_STATE_AWAITING_END;
+                }
+            }
         break;
         case '(':
           state=ARG_STATE_GATHERING_EXPRESSION;
@@ -274,7 +277,6 @@ static char** parseArguments(const char* input)
       }
     break;
     case ARG_STATE_GATHERING_EXPRESSION:
-      printf("ARG_STATE_GATHERING_EXPRESSION:%s\n",input);
       argumentString = (char*)realloc(argumentString,sizeof(char)*(length+2));
       if (argumentString==NULL)
       {
@@ -299,15 +301,14 @@ static char** parseArguments(const char* input)
             if (argId<2)
             {
               result[argId] = argumentString;
-              printf("result[%i]=%s\n",argId,argumentString);
               ++argId;
               argumentString = NULL;
               state = ARG_STATE_AWAITING_ARGUMENT;
             }
-      			else
-      			{
-      			  state = ARG_STATE_AWAITING_BRACKET;
-      			}
+            else
+            {
+              state = ARG_STATE_AWAITING_BRACKET;
+            }
           }
         break;
         default:
@@ -315,7 +316,6 @@ static char** parseArguments(const char* input)
       }
     break;
     case ARG_STATE_AWAITING_BRACKET:
-     printf("ARG_STATE_AWAITING_BRACKET:%s\n",input);
      switch (input[0])
      {
         case 0:
@@ -334,7 +334,6 @@ static char** parseArguments(const char* input)
      }
      break;
     case ARG_STATE_AWAITING_END:
-     printf("ARG_STATE_AWAITING_END:%s\n",input);
      switch (input[0])
      {
         case 0:
@@ -360,13 +359,13 @@ static char** parseArguments(const char* input)
   return NULL;
 }
 
+/*----------------------------------------------------------------------------*/
 #define EXPR_STATE_AWAITING_FIRST_SYMBOL      0
 #define EXPR_STATE_AWAITING_OPERATION         1
 #define EXPR_STATE_AWAITING_ARGUMENT          2
 #define EXPR_STATE_AWAITING_END               3
 #define EXPR_STATE_AWAITING_CLOSED            4
 #define EXPR_STATE_ERROR                      5
-
 
 static char** parseExpression(const char* input)
 {
@@ -479,23 +478,23 @@ static char** parseExpression(const char* input)
         }
       break;
       case EXPR_STATE_AWAITING_END:
-         switch (input[0])
-         {
-            case 0:
-              return result;
-            break;
-            case ' ':
-            break;
-            default:
-              state = EXPR_STATE_ERROR;
-            break;
-         }
+        switch (input[0])
+        {
+          case 0:
+            return result;
+          break;
+          case ' ':
+          break;
+          default:
+            state = EXPR_STATE_ERROR;
+          break;
+        }
       break;
       case EXPR_STATE_ERROR:
-        printf("ERROR: parse error\n");
+        printf("ERROR: parse error in parseExpression\n");
         return NULL;
       default:
-        printf("ERROR: unhandled state %i\n",state);
+        printf("ERROR: unhandled state %i in parseExpression\n",state);
         return NULL;
       break;
     }
@@ -503,6 +502,7 @@ static char** parseExpression(const char* input)
   return NULL;
 }
 
+/*----------------------------------------------------------------------------*/
 static struct Expression* getExpressionFromString(char* input)
 {
   struct Expression* result;
@@ -537,7 +537,6 @@ static struct Expression* getExpressionFromString(char* input)
       if (getSingleArgumentFromString(pStrings[0],result))
       {
         printf("ERROR: getSingleArgumentFromString failed\n");
-        printf("Look: %s\n",pStrings[0]);
         free(result);
         result = NULL;
       }
@@ -546,8 +545,8 @@ static struct Expression* getExpressionFromString(char* input)
     case 2:
     case 3:
       result->type = EXPR_OPERATION;
-	    result->uExpression.sOperation.arg1;
-	    result->uExpression.sOperation.arg2;
+        result->uExpression.sOperation.arg1;
+        result->uExpression.sOperation.arg2;
       if (getOperationFromString(pStrings[0],&result->uExpression.sOperation))
       {
         printf("ERROR: getOperationFromString failed\n");
@@ -559,13 +558,13 @@ static struct Expression* getExpressionFromString(char* input)
         printf("OpCode: %i\n",result->uExpression.sOperation.opcode);
         printf("args: %s %s\n",pStrings[1],pStrings[2]);
         result->uExpression.sOperation.arg1 = getExpressionFromString(pStrings[1]);
-		if (count==3)
-			result->uExpression.sOperation.arg2 = getExpressionFromString(pStrings[2]);
-		else
-		    result->uExpression.sOperation.arg2 = NULL;
+        if (count==3)
+            result->uExpression.sOperation.arg2 = getExpressionFromString(pStrings[2]);
+        else
+            result->uExpression.sOperation.arg2 = NULL;
         if (result->uExpression.sOperation.arg1 == NULL)
         {
-          printf("ERROR: getExpressionFromString 1 failed\n");
+          printf("ERROR: getExpressionFromString arg1 is null\n");
           free(result);
           result = NULL;
         }
@@ -576,8 +575,6 @@ static struct Expression* getExpressionFromString(char* input)
             if (pStrings[2]==NULL)
             {
               printf("ERROR: arg2 required for opcode %i but null string\n",result->uExpression.sOperation.opcode);
-      			  printf("     : arg1 is %s\n",pStrings[1]);
-      			  printf("     :%s\n",input);
               free(result->uExpression.sOperation.arg1);
               free(result);
               result = NULL;
@@ -587,7 +584,7 @@ static struct Expression* getExpressionFromString(char* input)
               result->uExpression.sOperation.arg2 = getExpressionFromString(pStrings[2]);
               if (result->uExpression.sOperation.arg2==NULL)
               {
-                printf("ERROR: getExpressionFromString 2 failed\n");
+                printf("ERROR: getExpressionFromString arg2 is null\n");
                 free(result->uExpression.sOperation.arg1);
                 free(result);
                 result = NULL;
@@ -622,31 +619,34 @@ static struct Expression* getExpressionFromString(char* input)
   return result;
 }
 
+/*----------------------------------------------------------------------------*/
 static void printExpression(struct Expression* pExpr)
 {
   if (pExpr==NULL)
   {
-    printf("ERROR: null pointer\n");
+    printf("ERROR: null pointer in printExpression\n");
     return;
   }
   if (pExpr->type == EXPR_SINGLE)
   {
     if (pExpr->uExpression.sArgument.type == VARIABLE_X)
-      printf(" x ");
+      printf("x");
     else
     {
       if (pExpr->uExpression.sArgument.type == CONSTANT_VALUE)
       {
         if (pExpr->uExpression.sArgument.uArgument.sConstant.type == CONST_INT)
-          printf(" %i ",pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.intValue);
+          printf("%i",pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.intValue);
         else
         {
           if (pExpr->uExpression.sArgument.uArgument.sConstant.type == CONST_FLOAT)
           {
-            printf(" %f ",pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue);
+            printf("%f",pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue);
           }
           else
-            printf("ERROR3\n");
+		  {
+			printf("ERROR: invalid type %i in printExpression\n");
+		  }
         }
       }
     }
@@ -689,9 +689,13 @@ static void printExpression(struct Expression* pExpr)
           printf("ERROR: not an operation %i\n",pExpr->uExpression.sOperation.opcode);
         break;
       }
+	  printf(" ");
       printExpression(pExpr->uExpression.sOperation.arg1);
       if (pExpr->uExpression.sOperation.twoArgsRequired)
-        printExpression(pExpr->uExpression.sOperation.arg2);
+	  {
+	    printf(" ");
+		printExpression(pExpr->uExpression.sOperation.arg2);
+	  }
       printf(")");
     }
     else
@@ -701,6 +705,7 @@ static void printExpression(struct Expression* pExpr)
   }
 }
 
+/*----------------------------------------------------------------------------*/
 static struct Expression* createIntConstant(int x)
 {
   struct Expression* result;
@@ -733,6 +738,7 @@ static struct Expression* createFloatConstant(float x)
   return result;
 }
 
+/*----------------------------------------------------------------------------*/
 static struct Expression* createVariableX()
 {
   struct Expression* result;
@@ -747,6 +753,7 @@ static struct Expression* createVariableX()
   return result;
 }
 
+/*----------------------------------------------------------------------------*/
 static int isConstant(struct Expression* pExpr)
 {
   if (pExpr==NULL)
@@ -758,9 +765,12 @@ static int isConstant(struct Expression* pExpr)
   return 1;
 }
 
+/*----------------------------------------------------------------------------*/
 static int isZero(struct Expression* pExpr)
 {
   /*
+  this function assumes that the input pointer
+  points to a constant structure
   if (!isConstant(pExpr))
     return 0;
   */
@@ -777,9 +787,12 @@ static int isZero(struct Expression* pExpr)
   return 0;
 }
 
+/*----------------------------------------------------------------------------*/
 static int isOne(struct Expression* pExpr)
 {
   /*
+  this function assumes that the input pointer
+  points to a constant structure
   if (!isConstant(pExpr))
     return 0;
   */
@@ -796,6 +809,7 @@ static int isOne(struct Expression* pExpr)
   return 0;
 }
 
+/*----------------------------------------------------------------------------*/
 static int isZeroOrNegative(struct Expression* pExpr)
 {
   if (!isConstant(pExpr))
@@ -813,6 +827,7 @@ static int isZeroOrNegative(struct Expression* pExpr)
   return 0;
 }
 
+/*----------------------------------------------------------------------------*/
 static int isVariableX(struct Expression* pExpr)
 {
   if (pExpr==NULL)
@@ -824,6 +839,7 @@ static int isVariableX(struct Expression* pExpr)
   return 1;
 }
 
+/*----------------------------------------------------------------------------*/
 static struct Expression* copyExpression(struct Expression* pExpr)
 {
   struct Expression* result;
@@ -841,10 +857,10 @@ static struct Expression* copyExpression(struct Expression* pExpr)
     result->uExpression.sOperation.arg1 = copyExpression(pExpr->uExpression.sOperation.arg1);
     result->uExpression.sOperation.arg2 = copyExpression(pExpr->uExpression.sOperation.arg2);
   }
-  printf("type==%i, value==%f\n",pExpr->type,pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue);
   return result;
 }
 
+/*----------------------------------------------------------------------------*/
 static int intPower(int a, int b)
 {
   int result,i;
@@ -855,6 +871,7 @@ static int intPower(int a, int b)
   return result;
 }
 
+/*----------------------------------------------------------------------------*/
 static struct Expression* getIntOperation(int a, int b, int opcode)
 {
   switch (opcode)
@@ -884,7 +901,7 @@ static struct Expression* getIntOperation(int a, int b, int opcode)
       {
         if (b<0)
         {
-          printf("ERROR: zero to negative power\n");
+          printf("ERROR: zero raised to negative power in getIntOperation\n");
           return NULL;
         }
         if (b==0)
@@ -896,12 +913,13 @@ static struct Expression* getIntOperation(int a, int b, int opcode)
       return createIntConstant(intPower(a,b));
     break;
     default:
-      printf("ERROR: unhandled opcode %i\n",opcode);
+      printf("ERROR: unhandled opcode %i in getIntOperation\n",opcode);
       return NULL;
     break;
   }
 }
 
+/*----------------------------------------------------------------------------*/
 static struct Expression* getFloatOperation(float a, float b, int opcode)
 {
   float temp;
@@ -929,11 +947,12 @@ static struct Expression* getFloatOperation(float a, float b, int opcode)
       return createFloatConstant(temp);
     break;
     default:
-      printf("ERROR: unhandled opcode %i\n",opcode);
+      printf("ERROR: unhandled opcode %i in getFloatOperation\n",opcode);
       return NULL;
     break;
   }
 }
+/*----------------------------------------------------------------------------*/
 static struct Expression* simplify(struct Expression* pExpr);
 static struct Expression* simplifyBinaryOperation(struct Expression* first, struct Expression* second, int opcode)
 {
@@ -943,63 +962,63 @@ static struct Expression* simplifyBinaryOperation(struct Expression* first, stru
   /*-----------------------------------------------------------------*/
   if (isConstant(first) && isZero(first))
   {
-  	switch (opcode)
-  	{
-  	  case OPCODE_PLUS:
-  	    return simplify(second);
-  	  break;
-  	  case OPCODE_MULTIPLY:
-  	    return createIntConstant(0);
-  	  break;
-  	  default:
-  	  break;
-  	}
+    switch (opcode)
+    {
+      case OPCODE_PLUS:
+        return simplify(second);
+      break;
+      case OPCODE_MULTIPLY:
+        return createIntConstant(0);
+      break;
+      default:
+      break;
+    }
   }
   if (isConstant(second) && isZero(second))
   {
-  	switch (opcode)
-  	{
-  	  case OPCODE_PLUS:
-  	  case OPCODE_MINUS:
-  	    return simplify(first);
-  	  break;
-  	  case OPCODE_MULTIPLY:
-  	    return createIntConstant(0);
-  	  break;
-  	  case OPCODE_DIVIDE:
-  	    printf("ERROR: division by zero\n");
-  		return NULL;
-  	  break;
-  	  default:
-  	  break;
-  	}
+    switch (opcode)
+    {
+      case OPCODE_PLUS:
+      case OPCODE_MINUS:
+        return simplify(first);
+      break;
+      case OPCODE_MULTIPLY:
+        return createIntConstant(0);
+      break;
+      case OPCODE_DIVIDE:
+        printf("ERROR: division by zero\n");
+        return NULL;
+      break;
+      default:
+      break;
+    }
   }
   if (isConstant(first) && isOne(first))
   {
-  	switch (opcode)
-  	{
-  	  case OPCODE_MULTIPLY:
-  	    return simplify(second);
-  	  break;
-  	  case OPCODE_POWER:
-  	    return createIntConstant(1);
-  	  break;
-  	  default:
-  	  break;
-  	}
+    switch (opcode)
+    {
+      case OPCODE_MULTIPLY:
+        return simplify(second);
+      break;
+      case OPCODE_POWER:
+        return createIntConstant(1);
+      break;
+      default:
+      break;
+    }
   }
   if (isConstant(second) && isOne(second))
   {
-  	switch (opcode)
-  	{
-  	  case OPCODE_MULTIPLY:
-  	  case OPCODE_DIVIDE:
-  	  case OPCODE_POWER:
-  	    return simplify(first);
-  	  break;
-  	  default:
-  	  break;
-  	}
+    switch (opcode)
+    {
+      case OPCODE_MULTIPLY:
+      case OPCODE_DIVIDE:
+      case OPCODE_POWER:
+        return simplify(first);
+      break;
+      default:
+      break;
+    }
   }
   /*------------ both expressions are constant values ---------------*/
   if ((isConstant(first)) && (isConstant(second)))
@@ -1037,7 +1056,7 @@ static struct Expression* simplifyBinaryOperation(struct Expression* first, stru
     result = (struct Expression*)malloc(sizeof(struct Expression));
     if (result==NULL)
     {
-      printf("ERROR: malloc in executeBinaryOperation\n");
+      printf("ERROR: malloc 1 in executeBinaryOperation\n");
       return NULL;
     }
     switch (opcode)
@@ -1059,8 +1078,9 @@ static struct Expression* simplifyBinaryOperation(struct Expression* first, stru
         return result;
       break;
       case OPCODE_MINUS:
+	    free(result);
         result = createIntConstant(0);
-        return result;
+		return result;
       break;
       /*
       case OPCODE_DIVIDE:
@@ -1074,7 +1094,7 @@ static struct Expression* simplifyBinaryOperation(struct Expression* first, stru
       break;
       */
       default:
-        printf("ERROR: unhandled opcode %i\n",opcode);
+        printf("ERROR: unhandled opcode %i in executeBinaryOperation (both x)\n",opcode);
         free(result);
         return NULL;
       break;
@@ -1111,7 +1131,7 @@ static struct Expression* simplifyBinaryOperation(struct Expression* first, stru
           return result;
         break;
         default:
-          printf("ERROR: unhandled opcode %i\n",opcode);
+          printf("ERROR: unhandled opcode %i in executeBinaryOperation (x and zero)\n",opcode);
           return NULL;
         break;
       }
@@ -1125,7 +1145,7 @@ static struct Expression* simplifyBinaryOperation(struct Expression* first, stru
           result = (struct Expression*)malloc(sizeof(struct Expression));
           if (result==NULL)
           {
-            printf("ERROR: malloc in executeBinaryOperation\n");
+            printf("ERROR: malloc 2 in executeBinaryOperation\n");
             return NULL;
           }
           result->type = EXPR_OPERATION;
@@ -1142,7 +1162,7 @@ static struct Expression* simplifyBinaryOperation(struct Expression* first, stru
           return result;
         break;
         default:
-          printf("ERROR: unhandled opcode %i\n",opcode);
+          printf("ERROR: unhandled opcode %i in executeBinaryOperation (x and one)\n",opcode);
           free(result);
           return NULL;
         break;
@@ -1153,7 +1173,7 @@ static struct Expression* simplifyBinaryOperation(struct Expression* first, stru
   result = (struct Expression*)malloc(sizeof(struct Expression));
   if (result==NULL)
   {
-    printf("ERROR: malloc in executeBinaryOperation\n");
+    printf("ERROR: malloc 3 in executeBinaryOperation\n");
     return NULL;
   }
   result->type = EXPR_OPERATION;
@@ -1195,7 +1215,7 @@ static struct Expression* simplify(struct Expression* pExpr)
       {
         if (isZeroOrNegative(arg1))
         {
-           printf("ERROR: logarithm of a non positive number\n");
+           printf("ERROR: logarithm of a non positive number in simplify\n");
            return NULL;
         }
       }
@@ -1213,6 +1233,59 @@ static struct Expression* simplify(struct Expression* pExpr)
   }
   printf("ERROR: invalid type %i in simplify\n",pExpr->type);
   return NULL;
+}
+
+static struct Expression* createOperation(int opcode, struct Expression* arg1, struct Expression* arg2)
+{
+  struct Expression* result;
+  int twoArgs;
+  if (arg1==NULL)
+  {
+	printf("ERROR: arg1 is null\n");
+	return NULL;
+  }
+  switch (opcode)
+  {
+	case OPCODE_PLUS:
+	case OPCODE_MINUS:
+	case OPCODE_MULTIPLY:
+	case OPCODE_DIVIDE:
+	case OPCODE_POWER:
+	  twoArgs=1;
+	  if (arg2==NULL)
+	  {
+	    printf("ERROR: arg2 is null\n");
+	    return NULL;
+	  }
+	break;
+	case OPCODE_SIN:
+	case OPCODE_COS:
+	case OPCODE_TAN:
+	case OPCODE_LN:
+	  twoArgs=0;
+	  if (arg2)
+	  {
+	    printf("ERROR: unexpected second argument\n");
+		return NULL;
+	  }
+	break;
+	default:
+	  printf("ERROR: unhandled opcode %i in createOperation\n",opcode);
+	  return NULL;
+	break;
+  }
+  result = (struct Expression*)malloc(sizeof(struct Expression));
+  if (result==NULL)
+  {
+    printf("ERROR: malloc in createOperation\n");
+    return NULL;
+  }
+  result->type = EXPR_OPERATION;
+  result->uExpression.sOperation.opcode = opcode;
+  result->uExpression.sOperation.twoArgsRequired = twoArgs;
+  result->uExpression.sOperation.arg1 = arg1
+  result->uExpression.sOperation.arg2 = arg2;
+  return result;
 }
 
 static struct Expression* derivate(struct Expression* pExpr)
@@ -1234,14 +1307,14 @@ static struct Expression* derivate(struct Expression* pExpr)
   {
 
   }
-  printf("ERROR: unexpected type\n");
+  printf("ERROR: unexpected type %i in derivate\n",pExpr->type);
   return NULL;
 }
 
 int main(int argc, char* argv[])
 {
   int n,c;
-  char s[]="(sin x)";
+  char s[]="(sin (+ (^ x 1) (- 5 5)))";
   char** p;
   int i;
   struct Expression* pExp = getExpressionFromString(s);
