@@ -1161,7 +1161,7 @@ static struct Expression* createOperation(int opcode, struct Expression* arg1, s
   return result;
 }
 
-static struct Expression* derivate(struct Expression* pExpr)
+static struct Expression* differentiate(struct Expression* pExpr)
 {
   int opcode;
   struct Expression* first, *second;
@@ -1187,13 +1187,13 @@ static struct Expression* derivate(struct Expression* pExpr)
     {
       case OPCODE_PLUS:
 	  case OPCODE_MINUS:
-	    return createOperation(opcode,derivate(first),derivate(second));
+	    return createOperation(opcode,differentiate(first),differentiate(second));
 	  break;
       case OPCODE_MULTIPLY:
 	    return createOperation(
 		                       OPCODE_PLUS,
-							   createOperation(OPCODE_MULTIPLY,   first,           derivate(second)),
-							   createOperation(OPCODE_MULTIPLY,   derivate(first), second)
+							   createOperation(OPCODE_MULTIPLY,   first,           differentiate(second)),
+							   createOperation(OPCODE_MULTIPLY,   differentiate(first), second)
 							  );
 	  break;
       case OPCODE_DIVIDE:
@@ -1201,20 +1201,66 @@ static struct Expression* derivate(struct Expression* pExpr)
 		                       OPCODE_DIVIDE,
 							   createOperation(
 							                   OPCODE_MINUS,
-							                   createOperation(OPCODE_MULTIPLY,derivate(first),second),
-											   createOperation(OPCODE_MULTIPLY,first,derivate(second))
+							                   createOperation(OPCODE_MULTIPLY,differentiate(first),second),
+											   createOperation(OPCODE_MULTIPLY,first,differentiate(second))
 											   ),
 							   createOperation(OPCODE_POWER,second,createIntConstant(2))
 							  );
 	  break;
       case OPCODE_POWER:
- 
+	    return createOperation(
+		                       OPCODE_MULTIPLY,
+							   createOperation(OPCODE_POWER,first,second),
+							   createOperation(
+							                   OPCODE_PLUS,
+											   createOperation(
+											                   OPCODE_MULTIPLY,
+															   createOperation(differentiate(first)),
+															   createOperation(OPCODE_DIVIDE,second,first)
+											                  ),
+											   createOperation(
+											                   OPCODE_MULTIPLY,
+															   differentiate(second),
+															   createOperation(OPCODE_LN,first,NULL)
+															  )
+							                  )
+		                      );
       break;
       case OPCODE_SIN:
+	    return createOperation(
+		                       OPCODE_MULTIPLY,
+		                       createOperation(OPCODE_COS,first),
+							   differentiate(first)
+							   );
+	  break;
       case OPCODE_COS:
+	    return createOperation(
+		                      OPCODE_MULTIPLY,
+							  createOperation(
+							                  OPCODE_MULTIPLY,
+											  createIntConstant(-1),
+											  createOperation(OPCODE_SIN,first)
+											 ),
+							  differentiate(first)
+							  );
+	  break;
       case OPCODE_TAN:
+	    return createOperation(
+		                       OPCODE_MULTIPLY,
+							   createOperation(
+							                   OPCODE_PLUS,
+											   createIntConstant(1),
+											   createOperation(
+											                   OPCODE_POWER,
+															   createOperation(OPCODE_TAN,first,NULL),
+															   createIntConstant(2)
+											                  )
+							                  ),
+							   differentiate(first)
+							  );
+	  break;
       case OPCODE_LN:
-
+        return createOperation(OPCODE_DIVIDE,differentiate(first),first);
       break;
       default:
         printf("ERROR: unhandled opcode %i in createOperation\n",opcode);
@@ -1222,7 +1268,7 @@ static struct Expression* derivate(struct Expression* pExpr)
       break;
     }
   }
-  printf("ERROR: unexpected type %i in derivate\n",pExpr->type);
+  printf("ERROR: unexpected type %i in differentiate\n",pExpr->type);
   return NULL;
 }
 
