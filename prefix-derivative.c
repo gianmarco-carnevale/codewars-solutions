@@ -1215,7 +1215,7 @@ static struct Expression* differentiate(struct Expression* pExpr)
 							                   OPCODE_PLUS,
 											   createOperation(
 											                   OPCODE_MULTIPLY,
-															   createOperation(differentiate(first)),
+															   differentiate(first),
 															   createOperation(OPCODE_DIVIDE,second,first)
 											                  ),
 											   createOperation(
@@ -1229,7 +1229,7 @@ static struct Expression* differentiate(struct Expression* pExpr)
       case OPCODE_SIN:
 	    return createOperation(
 		                       OPCODE_MULTIPLY,
-		                       createOperation(OPCODE_COS,first),
+		                       createOperation(OPCODE_COS,first,NULL),
 							   differentiate(first)
 							   );
 	  break;
@@ -1239,7 +1239,7 @@ static struct Expression* differentiate(struct Expression* pExpr)
 							  createOperation(
 							                  OPCODE_MULTIPLY,
 											  createIntConstant(-1),
-											  createOperation(OPCODE_SIN,first)
+											  createOperation(OPCODE_SIN,first,NULL)
 											 ),
 							  differentiate(first)
 							  );
