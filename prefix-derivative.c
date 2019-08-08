@@ -954,6 +954,55 @@ static struct Expression* copyExpression(struct Expression* pExpr)
   return result;
 }
 
+static int compareExpressions(struct Expression* first, struct Expression* second)
+{
+  if (first==NULL)
+  {
+    if (second==NULL)
+      return 0;
+    else
+      return -1;
+  }
+  if (second==NULL)
+    return -1;
+  if (first->type != second->type)
+    return -1;
+  if (first->type == EXPR_SINGLE)
+  {
+    if (isVariableX(first) && isVariableX(second))
+	  return 0;
+	if (first->uExpression.sArgument.uArgument.sConstant.type != second->uExpression.sArgument.uArgument.sConstant.type)
+        return 1;
+    if (first->uExpression.sArgument.uArgument.sConstant.type == CONST_INT)
+	{
+		if (first->uExpression.sArgument.uArgument.sConstant.uConstant.intValue == second->uExpression.sArgument.uArgument.sConstant.uConstant.intValue)
+		  return 0;
+	}
+	if (first->uExpression.sArgument.uArgument.sConstant.type == CONST_FLOAT)
+	{
+		if (first->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue == second->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue)
+		  return 0;
+	}
+	return -1;
+  }
+  else
+  {
+    if (first->type == EXPR_OPERATION)
+    {
+      if (first->uExpression.sOperation.opcode != second->uExpression.sOperation.opcode)
+        return -1;
+      if (first->uExpression.sOperation.twoArgsRequired != second->uExpression.sOperation.twoArgsRequired)
+        return -1;
+      if (compareExpressions(first->uExpression.sOperation.arg1,second->uExpression.sOperation.arg1))
+        return -1;
+      if (compareExpressions(first->uExpression.sOperation.arg2,second->uExpression.sOperation.arg2))
+        return -1;
+      return 0;
+    }
+  }
+  return -1;
+}
+
 /*----------------------------------------------------------------------------*/
 static int intPower(int a, int b)
 {
@@ -1076,7 +1125,19 @@ static struct Expression* simplify(struct Expression* pExpr)
   }
   if (pExpr->type == EXPR_SINGLE)
   {
-    return copyExpression(pExpr);
+    if (isConstant(pExpr))
+	{
+	  if (pExpr->uExpression.sArgument.uArgument.sConstant.type == CONST_FLOAT)
+	  {
+	    floatA = pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue;
+		intA = (int)floatA;
+		if ((float)intA == floatA)
+		{
+		  return createIntConstant(intA);
+		}
+	  }
+	}
+	return copyExpression(pExpr);
   }
   if (pExpr->type == EXPR_OPERATION)
   {
@@ -1214,20 +1275,21 @@ static struct Expression* simplify(struct Expression* pExpr)
         printf("ERROR: unexpected 1 in symplifyBinaryOperation\n");
         return NULL;
       }
-      /*------------ both expressions are x variable ---------------*/
-      if ((isVariableX(first)) && (isVariableX(second)))
+      if (compareExpressions(first,second)==0)
       {
         switch (opcode)
         {
           case OPCODE_PLUS:
-            deleteExpression(first);
+            result = createOperation(OPCODE_MULTIPLY,copyExpression(first),createIntConstant(2));
+			deleteExpression(first);
             deleteExpression(second);
-            return createOperation(OPCODE_MULTIPLY,createVariableX(),createIntConstant(2));
+			return result;
           break;
           case OPCODE_MULTIPLY:
+            result = createOperation(OPCODE_POWER,copyExpression(first),createIntConstant(2));
             deleteExpression(first);
             deleteExpression(second);
-            return createOperation(OPCODE_POWER,createVariableX(),createIntConstant(2));
+			return result;
           break;
           case OPCODE_MINUS:
             deleteExpression(first);
@@ -1277,7 +1339,7 @@ static struct Expression* createOperation(int opcode, struct Expression* arg1, s
     case OPCODE_SIN:
     case OPCODE_COS:
     case OPCODE_TAN:
-	case OPCODE_EXP:
+    case OPCODE_EXP:
     case OPCODE_LN:
       twoArgs=0;
       if (arg2!=NULL)
@@ -1427,7 +1489,7 @@ static struct Expression* differentiate(struct Expression* pExpr)
 int main(int argc, char* argv[])
 {
   char* output;
-  char s[]="(exp (* 2 x))";
+  char s[]="(* x (* x x))";
   struct Expression* pExp, *diff, *diff2, *final;
 
   pExp  = getExpressionFromString(s);
