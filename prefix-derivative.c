@@ -284,69 +284,76 @@ static char** parseArguments(const char* input)
               if (argumentString==NULL)
               {
                 printf("ERROR: Malloc in parseArguments\n");
-                if (result[0])
-                  Free(result[0]);
-                Free(result);
-                return NULL;
+                state = ARG_STATE_ERROR;
               }
-              length=0;
+              else
+              {
+                argumentString[0] = input[0];
+                argumentString[1] = 0;
+                length=1;
+              }
             }
             else
             {
               argumentString = (char*)realloc(argumentString,sizeof(char)*(length+2));
-              printf("ERROR: realloc 1 in parseArguments\n");
               if (argumentString==NULL)
               {
-                if (result[0])
-                  Free(result[0]);
-                Free(result);
-                return NULL;
+                printf("ERROR: realloc 1 in parseArguments\n");
+                state = ARG_STATE_ERROR;
+              }
+              else
+              {
+                argumentString[length] = input[0];
+                argumentString[length+1] = 0;
+                ++length;
               }
             }
-            argumentString[length] = input[0];
-            argumentString[length+1] = 0;
-            ++length;
           break;
         }
       break;
       case ARG_STATE_GATHERING_EXPRESSION:
-        argumentString = (char*)realloc(argumentString,sizeof(char)*(length+2));
-        if (argumentString==NULL)
+        if (input[0]==0)
+          state = ARG_STATE_ERROR;
+        else
         {
-          printf("ERROR: realloc 2 in parseArguments\n");
-          if (result[0])
-            Free(result[0]);
-          Free(result);
-          return NULL;
-        }
-        argumentString[length] = input[0];
-        argumentString[length+1] = 0;
-        ++length;
-        switch (input[0])
-        {
-          case '(':
-            ++brackets;
-          break;
-          case ')':
-            --brackets;
-            if (brackets==0)
-            {
-              if (argId<2)
+           argumentString = (char*)realloc(argumentString,sizeof(char)*(length+2));
+           if (argumentString==NULL)
+           {
+             printf("ERROR: realloc 2 in parseArguments\n");
+             state = ARG_STATE_ERROR;
+           }
+           else
+           {
+              argumentString[length] = input[0];
+              argumentString[length+1] = 0;
+              ++length;
+              switch (input[0])
               {
-                result[argId] = argumentString;
-                ++argId;
-                argumentString = NULL;
-                state = ARG_STATE_AWAITING_ARGUMENT;
+                case '(':
+                  ++brackets;
+                break;
+                case ')':
+                  --brackets;
+                  if (brackets==0)
+                  {
+                    if (argId<2)
+                    {
+                      result[argId] = argumentString;
+                      ++argId;
+                      argumentString = NULL;
+                      state = ARG_STATE_AWAITING_ARGUMENT;
+                    }
+                    else
+                    {
+                      state = ARG_STATE_AWAITING_BRACKET;
+                    }
+                  }
+                break;
+                default:
+                break;
               }
-              else
-              {
-                state = ARG_STATE_AWAITING_BRACKET;
-              }
-            }
-          break;
-          default:
-          break;
-        }
+           }
+		}
       break;
       case ARG_STATE_AWAITING_BRACKET:
        switch (input[0])
@@ -370,6 +377,8 @@ static char** parseArguments(const char* input)
        switch (input[0])
        {
           case 0:
+            if (argumentString)
+              Free(argumentString);
             return result;
           break;
           case ' ':
@@ -466,7 +475,7 @@ static char** parseExpression(const char* input)
             }
             else
             {
-              printf("ERROR: first argument too long\n");
+              printf("ERROR: argument too long\n");
               state = EXPR_STATE_ERROR;
             }
           break;
@@ -619,6 +628,8 @@ static struct Expression* getExpressionFromString(const char* input)
     case 2:
     case 3:
       result->type = EXPR_OPERATION;
+      result->uExpression.sOperation.arg1 = NULL;
+      result->uExpression.sOperation.arg2 = NULL;
       if (getOperationFromString(pStrings[0],&result->uExpression.sOperation))
       {
         printf("ERROR: getOperationFromString failed\n");
@@ -1432,6 +1443,45 @@ static struct Expression* createOperation(int opcode, struct Expression* arg1, s
   return result;
 }
 
+static struct Expression* differentiate(struct Expression* pExpr);
+static struct Expression* createPowerDerivative(struct Expression* base, struct Expression* exponent, struct Expression* pExpr)
+{
+  if (isConstant(base))
+  {
+    return createOperation(
+                           OPCODE_MULTIPLY,
+                           createOperation(
+                                           OPCODE_LN,
+                                           copyExpression(base),
+                                           NULL),
+                           copyExpression(pExpr)
+                           );
+  }
+  else
+  {
+    if (isConstant(exponent))
+    {
+      return createOperation(
+                             OPCODE_MULTIPLY,
+                             createOperation(
+                                             OPCODE_MULTIPLY,
+                                             copyExpression(exponent),
+                                             createOperation(
+                                                             OPCODE_POWER,
+                                                             copyExpression(base),
+                                                             createOperation(OPCODE_MINUS,copyExpression(exponent),createIntConstant(-1))
+                                                             )
+                                        ),
+                         differentiate(base)
+                         );
+    }
+    else
+    {
+
+    }
+  }
+}
+
 static struct Expression* differentiate(struct Expression* pExpr)
 {
   int opcode;
@@ -1654,7 +1704,7 @@ int main(int argc, char* argv[])
   diffShouldBe ("(sin (* 2 x))", "(* 2 (cos (* 2 x)))");
   diffShouldBe ("(exp (* 2 x))", "(* 2 (exp (* 2 x)))");
 #endif
-  char s[] = "(+ 3 4  )";
+  char s[] = "x";
   char* d = diff(s);
   if (d)
   {
