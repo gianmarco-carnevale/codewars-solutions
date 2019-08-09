@@ -116,7 +116,29 @@ static void Free(void* p)
   free(p);
 }
 
-/*----------------------------------------------------------------------------*/
+
+static int getOperationFromString(char* input, struct Operation* pOperation);
+static int getSingleArgumentFromString(char* input, struct Expression* pExpr);
+static char** parseArguments(const char* input);
+static char** parseExpression(const char* input);
+static struct Expression* getExpressionFromString(const char* input);
+static size_t getExpressionLength(struct Expression* pExpr);
+static char* printExpression(struct Expression* pExpr);
+static struct Expression* createIntConstant(int x);
+static struct Expression* createFloatConstant(float x);
+static struct Expression* createVariableX();
+static int isConstant(struct Expression* pExpr);
+static int isZeroOrNegative(struct Expression* pExpr);
+static int isVariableX(struct Expression* pExpr);
+static struct Expression* copyExpression(struct Expression* pExpr);
+static int compareExpressions(struct Expression* first, struct Expression* second);
+static struct Expression* getIntOperation(int a, int b, int opcode);
+static struct Expression* getFloatOperation(float a, float b, int opcode);
+static void deleteExpression(struct Expression* pExpr);
+static struct Expression* simplify(struct Expression* pExpr);
+static struct Expression* createOperation(int opcode, struct Expression* arg1, struct Expression* arg2);
+static struct Expression* differentiate(struct Expression* pExpr);
+/*--------------------------------------------------------------------------------*/
 static int getOperationFromString(char* input, struct Operation* pOperation)
 {
   if (strcmp(input,"+")==0)
@@ -582,8 +604,6 @@ static char** parseExpression(const char* input)
 }
 
 /*----------------------------------------------------------------------------*/
-static void deleteExpression(struct Expression*);
-
 static struct Expression* getExpressionFromString(const char* input)
 {
   struct Expression* result;
@@ -759,7 +779,7 @@ static char* printExpression(struct Expression* pExpr)
         {
           if (pExpr->uExpression.sArgument.uArgument.sConstant.type == CONST_FLOAT)
           {
-            n = sprintf(temp,"%f",pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue);
+            n = sprintf(temp,"%1.1f",pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue);
             temp += n;
           }
           else
@@ -1161,8 +1181,6 @@ static void deleteExpression(struct Expression* pExpr)
 }
 
 /*----------------------------------------------------------------------------*/
-static struct Expression* createOperation(int opcode, struct Expression* arg1, struct Expression* arg2);
-
 static struct Expression* simplify(struct Expression* pExpr)
 {
   struct Expression *first, *second, *result;
@@ -1181,11 +1199,11 @@ static struct Expression* simplify(struct Expression* pExpr)
       if (pExpr->uExpression.sArgument.uArgument.sConstant.type == CONST_FLOAT)
       {
         floatA = pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue;
-          intA = (int)floatA;
-            if ((float)intA == floatA)
-            {
-              return createIntConstant(intA);
-            }
+        intA = (int)floatA;
+        if ((float)intA == floatA)
+        {
+          return createIntConstant(intA);
+        }
       }
     }
     return copyExpression(pExpr);
@@ -1235,7 +1253,7 @@ static struct Expression* simplify(struct Expression* pExpr)
       }
       */
       /*-----------------------------------------------------------------*/
-      if (isConstant(first) && isZero(first))
+      if (isConstant(first) && isZero(first) && !isConstant(second))
       {
         switch (opcode)
         {
@@ -1254,7 +1272,7 @@ static struct Expression* simplify(struct Expression* pExpr)
           break;
         }
       }
-      if (isConstant(second) && isZero(second))
+      if (!isConstant(first) && isConstant(second) && isZero(second))
       {
         switch (opcode)
         {
@@ -1270,6 +1288,11 @@ static struct Expression* simplify(struct Expression* pExpr)
             deleteExpression(second);
             return createIntConstant(0);
           break;
+		  case OPCODE_POWER:
+            deleteExpression(first);
+            deleteExpression(second);
+		    return createIntConstant(1);
+		  break;
           case OPCODE_DIVIDE:
             printf("ERROR: division by zero\n");
             return NULL;
@@ -1278,7 +1301,7 @@ static struct Expression* simplify(struct Expression* pExpr)
           break;
         }
       }
-      if (isConstant(first) && isOne(first))
+      if (isConstant(first) && isOne(first) && !isConstant(second))
       {
         switch (opcode)
         {
@@ -1297,7 +1320,7 @@ static struct Expression* simplify(struct Expression* pExpr)
           break;
         }
       }
-      if (isConstant(second) && isOne(second))
+      if (!isConstant(first) && isConstant(second) && isOne(second))
       {
         switch (opcode)
         {
@@ -1443,25 +1466,29 @@ static struct Expression* createOperation(int opcode, struct Expression* arg1, s
   return result;
 }
 
-static struct Expression* differentiate(struct Expression* pExpr);
 static struct Expression* createPowerDerivative(struct Expression* base, struct Expression* exponent, struct Expression* pExpr)
 {
-  if (isConstant(base))
+  if (isConstant(base) && !isConstant(exponent))
   {
     return createOperation(
                            OPCODE_MULTIPLY,
                            createOperation(
-                                           OPCODE_LN,
-                                           copyExpression(base),
-                                           NULL),
-                           copyExpression(pExpr)
+                                           OPCODE_MULTIPLY,
+										   createOperation(
+										                  OPCODE_LN,
+														  copyExpression(base),
+														  NULL
+														  ),
+                                           copyExpression(pExpr)
+										  ),
+                           differentiate(pExpr)
                            );
   }
   else
   {
-    if (isConstant(exponent))
+    if (!isConstant(base) && isConstant(exponent))
     {
-      return createOperation(
+	  return createOperation(
                              OPCODE_MULTIPLY,
                              createOperation(
                                              OPCODE_MULTIPLY,
@@ -1469,17 +1496,35 @@ static struct Expression* createPowerDerivative(struct Expression* base, struct 
                                              createOperation(
                                                              OPCODE_POWER,
                                                              copyExpression(base),
-                                                             createOperation(OPCODE_MINUS,copyExpression(exponent),createIntConstant(-1))
+                                                             createOperation(OPCODE_MINUS,copyExpression(exponent),createIntConstant(1))
                                                              )
-                                        ),
-                         differentiate(base)
+                                            ),
+                            differentiate(base)
                          );
     }
     else
     {
-
+		printf("NOT YET READY!!!\n");
+		return NULL;
     }
   }
+}
+
+static struct Expression* createMultiplyDerivative(struct Expression* first, struct Expression* second)
+{
+  if (isConstant(first))
+  {
+    return createOperation(OPCODE_MULTIPLY,copyExpression(first),differentiate(second));
+  }
+  if (isConstant(second))
+  {
+    return createOperation(OPCODE_MULTIPLY,differentiate(first),copyExpression(second));
+  }
+  return createOperation(
+					   OPCODE_PLUS,
+					   createOperation(OPCODE_MULTIPLY, copyExpression(first), differentiate(second)),
+					   createOperation(OPCODE_MULTIPLY, differentiate(first),  copyExpression(second))
+					   );
 }
 
 static struct Expression* differentiate(struct Expression* pExpr)
@@ -1511,84 +1556,38 @@ static struct Expression* differentiate(struct Expression* pExpr)
         result = createOperation(opcode,differentiate(first),differentiate(second));
       break;
       case OPCODE_MULTIPLY:
-        result = createOperation(
-                               OPCODE_PLUS,
-                               createOperation(OPCODE_MULTIPLY, copyExpression(first), differentiate(second)),
-                               createOperation(OPCODE_MULTIPLY, differentiate(first),  copyExpression(second))
-                              );
+        result = createMultiplyDerivative(first,second);
       break;
       case OPCODE_DIVIDE:
         result = createOperation(
-                               OPCODE_DIVIDE,
-                               createOperation(
-                                               OPCODE_MINUS,
-                                               createOperation(OPCODE_MULTIPLY,differentiate(first),copyExpression(second)),
-                                               createOperation(OPCODE_MULTIPLY,copyExpression(first),differentiate(second))
+                                OPCODE_DIVIDE,
+                                createOperation(
+                                                OPCODE_MINUS,
+                                                createOperation(OPCODE_MULTIPLY,differentiate(first),copyExpression(second)),
+                                                createOperation(OPCODE_MULTIPLY,copyExpression(first),differentiate(second))
                                                ),
-                               createOperation(OPCODE_POWER,copyExpression(second),createIntConstant(2))
-                              );
-
+                                createOperation(OPCODE_MULTIPLY,copyExpression(second),copyExpression(second))
+                                );
       break;
       case OPCODE_POWER:
-        if (isConstant(first))
-        {
-          result = createOperation(OPCODE_MULTIPLY,createOperation(OPCODE_LN,copyExpression(first),NULL),copyExpression(pExpr));
-        }
-        else
-        {
-          if (isConstant(second))
-          {
-            result = createOperation(
-                                     OPCODE_MULTIPLY,
-                                     createOperation(
-                                                     OPCODE_MULTIPLY,
-                                                     copyExpression(second),
-                                                     createOperation(
-                                                                    OPCODE_POWER,
-                                                                    copyExpression(first),
-                                                                    createOperation(OPCODE_MINUS,copyExpression(second),createIntConstant(-1))
-                                                                    )
-                                                    ),
-                                     differentiate(first)
-                                     );
-          }
-          else
-
-        result = createOperation(
-                               OPCODE_MULTIPLY,
-                               createOperation(OPCODE_POWER,copyExpression(first),copyExpression(second)),
-                               createOperation(
-                                               OPCODE_PLUS,
-                                               createOperation(
-                                                               OPCODE_MULTIPLY,
-                                                               differentiate(first),
-                                                               createOperation(OPCODE_DIVIDE,copyExpression(first),copyExpression(second))
-                                                              ),
-                                               createOperation(
-                                                               OPCODE_MULTIPLY,
-                                                               differentiate(second),
-                                                               createOperation(OPCODE_LN,copyExpression(first),NULL)
-                                                              )
-                                              )
-                              );
-      }
+        result = createPowerDerivative(first,second,pExpr);
       break;
       case OPCODE_SIN:
         result = createOperation(
                                OPCODE_MULTIPLY,
-                               createOperation(OPCODE_COS,copyExpression(first),NULL),
-                               differentiate(first)
+							   differentiate(first),
+                               createOperation(OPCODE_COS,copyExpression(first),NULL)
                                );
       break;
       case OPCODE_COS:
         result = createOperation(
                               OPCODE_MULTIPLY,
+							  differentiate(first),
                               createOperation(
                                               OPCODE_MULTIPLY,
                                               createIntConstant(-1),
                                               createOperation(OPCODE_SIN,copyExpression(first),NULL)
-                                             ),
-                              differentiate(first)
+                                             )
                               );
       break;
       case OPCODE_TAN:
@@ -1618,25 +1617,34 @@ static struct Expression* differentiate(struct Expression* pExpr)
       break;
     }
     final = simplify(result);
-    deleteExpression(result);
+	/*
+	printf("simplify[ %s ] == %s\n",printExpression(result),printExpression(final));
+    */
+	deleteExpression(result);
     return final;
   }
   printf("ERROR: unexpected type %i in differentiate\n",pExpr->type);
   return NULL;
 }
 
-char* diff (const char* input)
+/*---------------------------------------------------------------------------------------------------------*/
+static char buffer[1024];
+char* diff(char* input)
 {
   struct Expression *pExpr, *differentiated;
   char* result;
   pExpr = getExpressionFromString(input);
   differentiated = differentiate(pExpr);
-  result = printExpression(differentiated);
   deleteExpression(pExpr);
+  result = printExpression(differentiated);
   deleteExpression(differentiated);
-  return result;
+  memset(buffer,0,1024);
+  strcpy(buffer,result);
+  Free(result);
+  return &buffer[0];
 }
 
+/*-------------------------------------------------------------------------------------------------------*/
 #if 0
 Test (test_cases, sample_tests_1) {
 
@@ -1666,31 +1674,36 @@ Test (test_cases, second_derivatives) {
 #endif
 
 
-void diffShouldBe (char *input, char *expected) {
-  const char *result = diff (input);
+void diffShouldBe (char *input, char *expected)
+{
+  char *result = diff(input);
+  
   if (strcmp(expected,result))
     printf ("diff (%s) should be %s, got %s\n", input, expected, result);
-
 }
 
-void diff2ShouldBe (char *input, char *expected) {
-  const char *result = diff (diff (input));
+void diff2ShouldBe (char *input, char *expected)
+{
+  char *result = diff (diff (input));
   if (strcmp(expected,result))
     printf ("diff (diff (%s)) should be %s, got %s\n", input, expected, result);
-
 }
 
 
 int main(int argc, char* argv[])
 {
-#if 0
+#if 1
+
   diffShouldBe ("5", "0");
   diffShouldBe ("x", "1");
   diffShouldBe ("(+ x x)", "2");
   diffShouldBe ("(- x x)", "0");
+  
   diffShouldBe ("(* x 2)", "2");
   diffShouldBe ("(/ x 2)", "0.5");
   diffShouldBe ("(^ x 2)", "(* 2 x)");
+  
+  
   diffShouldBe ("(cos x)", "(* -1 (sin x))");
   diffShouldBe ("(sin x)", "(cos x)");
   diffShouldBe ("(exp x)", "(exp x)");
@@ -1703,15 +1716,21 @@ int main(int argc, char* argv[])
   diffShouldBe ("(sin (+ x 1))", "(cos (+ x 1))");
   diffShouldBe ("(sin (* 2 x))", "(* 2 (cos (* 2 x)))");
   diffShouldBe ("(exp (* 2 x))", "(* 2 (exp (* 2 x)))");
+  
 #endif
-  char s[] = "x";
-  char* d = diff(s);
-  if (d)
-  {
-    printf("d/dx (%s) == %s\n",s,d);
-    Free(d);
-  }
-  printf("\nmallocCalls == %i\n",mallocCalls);
 
+
+
+  
+
+#if 0
+#define N 3
+  char* s[N]={"(* x 2)","(/ x 2)","(^ x 2)"};
+  int i;
+  for (i=0;i<N;++i)
+	printf("d/dx[ %s ] == %s\n",s[i],diff(s[i]));
+  
+#endif
+  printf("\nmallocCalls == %i\n",mallocCalls);
   return 0;
 }
