@@ -1171,6 +1171,7 @@ static struct Expression* simplify(struct Expression* pExpr)
     else
     {
       second = simplify(pExpr->uExpression.sOperation.arg2);
+      /*
       if (!isConstant(first) && isConstant(second))
       {
         if ((opcode==OPCODE_PLUS)||(opcode==OPCODE_MULTIPLY))
@@ -1181,6 +1182,7 @@ static struct Expression* simplify(struct Expression* pExpr)
           return simplify(result);
         }
       }
+      */
       /*-----------------------------------------------------------------*/
       if (isConstant(first) && isZero(first))
       {
@@ -1438,6 +1440,30 @@ static struct Expression* differentiate(struct Expression* pExpr)
 
       break;
       case OPCODE_POWER:
+        if (isConstant(first))
+        {
+          result = createOperation(OPCODE_MULTIPLY,createOperation(OPCODE_LN,copyExpression(first),NULL),copyExpression(pExpr));
+        }
+        else
+        {
+          if (isConstant(second))
+          {
+            result = createOperation(
+                                     OPCODE_MULTIPLY,
+                                     createOperation(
+                                                     OPCODE_MULTIPLY,
+                                                     copyExpression(second),
+                                                     createOperation(
+                                                                    OPCODE_POWER,
+                                                                    copyExpression(first),
+                                                                    createOperation(OPCODE_MINUS,copyExpression(second),createIntConstant(-1))
+                                                                    )
+                                                    ),
+                                     differentiate(first)
+                                     );
+          }
+          else
+
         result = createOperation(
                                OPCODE_MULTIPLY,
                                createOperation(OPCODE_POWER,copyExpression(first),copyExpression(second)),
@@ -1455,6 +1481,7 @@ static struct Expression* differentiate(struct Expression* pExpr)
                                                               )
                                               )
                               );
+      }
       break;
       case OPCODE_SIN:
         result = createOperation(
