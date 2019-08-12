@@ -1010,15 +1010,29 @@ static struct Expression* copyExpression(struct Expression* pExpr)
   struct Expression* result;
   if (pExpr==NULL)
     return NULL;
-  result = (struct Expression*)Malloc(sizeof(struct Expression));
-  if (result==NULL)
+  if (pExpr->type == EXPR_SINGLE)
   {
-    printf("ERROR: Malloc in copyExpression\n");
-    return NULL;
+    if (pExpr->uExpression.sArgument.type == VARIABLE_X)
+      return createVariableX();
+    if (pExpr->uExpression.sArgument.type == CONSTANT_VALUE)
+    {
+      if (pExpr->uExpression.sArgument.uArgument.sConstant.type == CONST_INT)
+        return createIntConstant(pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.intValue);
+      if (pExpr->uExpression.sArgument.uArgument.sConstant.type == CONST_FLOAT)
+        return createFloatConstant(pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue);
+    }
   }
-  *result = *pExpr;
   if (pExpr->type == EXPR_OPERATION)
   {
+    result = (struct Expression*)Malloc(sizeof(struct Expression));
+    if (result==NULL)
+    {
+      printf("ERROR: Malloc in copyExpression\n");
+      return NULL;
+    }
+    result->type = pExpr->type;
+    result->uExpression.sOperation.opcode = pExpr->uExpression.sOperation.opcode;
+    result->uExpression.sOperation.twoArgsRequired = pExpr->uExpression.sOperation.twoArgsRequired;
     result->uExpression.sOperation.arg1 = copyExpression(pExpr->uExpression.sOperation.arg1);
     result->uExpression.sOperation.arg2 = copyExpression(pExpr->uExpression.sOperation.arg2);
   }
@@ -1042,19 +1056,22 @@ static int compareExpressions(struct Expression* first, struct Expression* secon
   {
     if (isVariableX(first) && isVariableX(second))
       return 0;
-    if (first->uExpression.sArgument.uArgument.sConstant.type != second->uExpression.sArgument.uArgument.sConstant.type)
+    if (isConstant(first) && isConstant(second))
+    {
+        if (first->uExpression.sArgument.uArgument.sConstant.type != second->uExpression.sArgument.uArgument.sConstant.type)
         return 1;
-    if (first->uExpression.sArgument.uArgument.sConstant.type == CONST_INT)
-    {
-        if (first->uExpression.sArgument.uArgument.sConstant.uConstant.intValue == second->uExpression.sArgument.uArgument.sConstant.uConstant.intValue)
-          return 0;
+        if (first->uExpression.sArgument.uArgument.sConstant.type == CONST_INT)
+        {
+            if (first->uExpression.sArgument.uArgument.sConstant.uConstant.intValue == second->uExpression.sArgument.uArgument.sConstant.uConstant.intValue)
+              return 0;
+        }
+        if (first->uExpression.sArgument.uArgument.sConstant.type == CONST_FLOAT)
+        {
+            if (first->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue == second->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue)
+              return 0;
+        }
+        return -1;
     }
-    if (first->uExpression.sArgument.uArgument.sConstant.type == CONST_FLOAT)
-    {
-        if (first->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue == second->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue)
-          return 0;
-    }
-    return -1;
   }
   else
   {
@@ -1181,6 +1198,7 @@ static void deleteExpression(struct Expression* pExpr)
 }
 
 /*----------------------------------------------------------------------------*/
+static int debug = 0;
 static struct Expression* simplify(struct Expression* pExpr)
 {
   struct Expression *first, *second, *result;
@@ -1192,22 +1210,26 @@ static struct Expression* simplify(struct Expression* pExpr)
     printf("ERROR: null pointer in simplify\n");
     return NULL;
   }
-  if (pExpr->type == EXPR_SINGLE)
+  if (isVariableX(pExpr))
+    return createVariableX();
+
+  if (isConstant(pExpr))
   {
-    if (isConstant(pExpr))
+    if (pExpr->uExpression.sArgument.uArgument.sConstant.type == CONST_FLOAT)
     {
-      if (pExpr->uExpression.sArgument.uArgument.sConstant.type == CONST_FLOAT)
+      floatA = pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue;
+      intA = (int)floatA;
+      if ((float)intA == floatA)
       {
-        floatA = pExpr->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue;
-        intA = (int)floatA;
-        if ((float)intA == floatA)
-        {
-          return createIntConstant(intA);
-        }
+        return createIntConstant(intA);
       }
-    }
-    return copyExpression(pExpr);
+      else
+        return createFloatConstant(floatA);
+      }
+      else
+        return copyExpression(pExpr);
   }
+  
   if (pExpr->type == EXPR_OPERATION)
   {
     opcode = pExpr->uExpression.sOperation.opcode;
@@ -1235,11 +1257,20 @@ static struct Expression* simplify(struct Expression* pExpr)
           return createIntConstant(1);
         }
       }
-      return createOperation(opcode,first,NULL);
+      result = createOperation(opcode,copyExpression(first),NULL);
+      deleteExpression(first);
+      return result;
     }
     else
     {
       second = simplify(pExpr->uExpression.sOperation.arg2);
+      if (debug)
+      {
+        printf("pExpr : %s\n",printExpression(pExpr));
+        printf("first : %s\n",printExpression(first));
+        printf("second: %s\n",printExpression(second));
+        --debug;
+      }
       /*-----------------------------------------------------------------*/
       if (isConstant(first) && isZero(first) && !isConstant(second))
       {
@@ -1327,7 +1358,7 @@ static struct Expression* simplify(struct Expression* pExpr)
       /*------------ both expressions are constant values ---------------*/
       if ((isConstant(first)) && (isConstant(second)))
       {
-        if ((first->uExpression.sArgument.type = CONST_INT)&&(second->uExpression.sArgument.uArgument.sConstant.type = CONST_INT))
+        if ((first->uExpression.sArgument.uArgument.sConstant.type == CONST_INT)&&(second->uExpression.sArgument.uArgument.sConstant.type == CONST_INT))
         {
           intA = first->uExpression.sArgument.uArgument.sConstant.uConstant.intValue;
           intB = second->uExpression.sArgument.uArgument.sConstant.uConstant.intValue;
@@ -1335,7 +1366,7 @@ static struct Expression* simplify(struct Expression* pExpr)
           deleteExpression(second);
           return getIntOperation(intA, intB, opcode);
         }
-        if ((first->uExpression.sArgument.type = CONST_INT)&&(second->uExpression.sArgument.uArgument.sConstant.type = CONST_FLOAT))
+        if ((first->uExpression.sArgument.uArgument.sConstant.type == CONST_INT)&&(second->uExpression.sArgument.uArgument.sConstant.type == CONST_FLOAT))
         {
           floatA = (float)first->uExpression.sArgument.uArgument.sConstant.uConstant.intValue;
           floatB = second->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue;
@@ -1343,7 +1374,7 @@ static struct Expression* simplify(struct Expression* pExpr)
           deleteExpression(second);
           return getFloatOperation(floatA, floatB, opcode);
         }
-        if ((first->uExpression.sArgument.uArgument.sConstant.type = CONST_FLOAT)&&(second->uExpression.sArgument.uArgument.sConstant.type = CONST_INT))
+        if ((first->uExpression.sArgument.uArgument.sConstant.type == CONST_FLOAT)&&(second->uExpression.sArgument.uArgument.sConstant.type == CONST_INT))
         {
           floatA = first->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue;
           floatB = (float)second->uExpression.sArgument.uArgument.sConstant.uConstant.intValue;
@@ -1351,7 +1382,7 @@ static struct Expression* simplify(struct Expression* pExpr)
           deleteExpression(second);
           return getFloatOperation(floatA, floatB, opcode);
         }
-        if ((first->uExpression.sArgument.uArgument.sConstant.type = CONST_FLOAT)&&(second->uExpression.sArgument.uArgument.sConstant.type = CONST_FLOAT))
+        if ((first->uExpression.sArgument.uArgument.sConstant.type == CONST_FLOAT)&&(second->uExpression.sArgument.uArgument.sConstant.type == CONST_FLOAT))
         {
           floatA = first->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue;
           floatB = second->uExpression.sArgument.uArgument.sConstant.uConstant.floatValue;
@@ -1478,9 +1509,9 @@ static struct Expression* createPowerDerivative(struct Expression* base, struct 
     if (!isConstant(base) && isConstant(exponent))
     {
       if (exponent->uExpression.sArgument.uArgument.sConstant.type == CONST_INT)
-	  {
+      {
 
-		result = createOperation(
+        result = createOperation(
                                OPCODE_MULTIPLY,
                                createOperation(
                                                OPCODE_MULTIPLY,
@@ -1493,9 +1524,9 @@ static struct Expression* createPowerDerivative(struct Expression* base, struct 
                                               ),
                               differentiate(base)
                            );
-		return result;
-	  }
-	  else
+        return result;
+      }
+      else
         return createOperation(
                                OPCODE_MULTIPLY,
                                createOperation(
@@ -1509,7 +1540,7 @@ static struct Expression* createPowerDerivative(struct Expression* base, struct 
                                               ),
                               differentiate(base)
                            );
-	  
+      
     }
     else
     {
@@ -1542,17 +1573,10 @@ static struct Expression* differentiate(struct Expression* pExpr)
   struct Expression* first, *second, *result, *final;
   if (pExpr==NULL)
     return NULL;
-  if (pExpr->type == EXPR_SINGLE)
-  {
-    if (pExpr->uExpression.sArgument.type == VARIABLE_X)
-    {
-      return createIntConstant(1);
-    }
-    if (pExpr->uExpression.sArgument.type == CONSTANT_VALUE)
-    {
-      return createIntConstant(0);
-    }
-  }
+  if (isVariableX(pExpr))
+    return createIntConstant(1);
+  if (isConstant(pExpr))
+    return createIntConstant(0);
   if (pExpr->type == EXPR_OPERATION)
   {
     opcode = pExpr->uExpression.sOperation.opcode;
@@ -1602,6 +1626,7 @@ static struct Expression* differentiate(struct Expression* pExpr)
       case OPCODE_TAN:
         result = createOperation(
                                OPCODE_MULTIPLY,
+							   differentiate(first),
                                createOperation(
                                                OPCODE_PLUS,
                                                createIntConstant(1),
@@ -1610,8 +1635,8 @@ static struct Expression* differentiate(struct Expression* pExpr)
                                                                createOperation(OPCODE_TAN,copyExpression(first),NULL),
                                                                createIntConstant(2)
                                                               )
-                                              ),
-                               differentiate(first)
+                                              )
+                               
                               );
       break;
       case OPCODE_EXP:
@@ -1707,11 +1732,12 @@ int main(int argc, char* argv[])
   diffShouldBe ("x", "1");
   diffShouldBe ("(+ x x)", "2");
   diffShouldBe ("(- x x)", "0");
-  
+  diffShouldBe ("(exp (* 2 x))", "(* 2 (exp (* 2 x)))");
   diffShouldBe ("(* x 2)", "2");
   diffShouldBe ("(/ x 2)", "0.5");
   diffShouldBe ("(^ x 2)", "(* 2 x)");
   
+
   
   diffShouldBe ("(cos x)", "(* -1 (sin x))");
   diffShouldBe ("(sin x)", "(cos x)");
@@ -1726,18 +1752,19 @@ int main(int argc, char* argv[])
   diffShouldBe ("(sin (* 2 x))", "(* 2 (cos (* 2 x)))");
   diffShouldBe ("(exp (* 2 x))", "(* 2 (exp (* 2 x)))");
   
+  
 #endif
 
 
 
   
 
-#if 0
-#define N 3
-  char* s[N]={"(* x 2)","(/ x 2)","(^ x 2)"};
-  int i;
-  for (i=0;i<N;++i)
-    printf("d/dx[ %s ] == %s\n",s[i],diff(s[i]));
+#if 1
+
+  
+  printf("Example: %s\n",diff("(tan (* 2 x))")); 
+
+  
   
 #endif
   printf("\nmallocCalls == %i\n",mallocCalls);
