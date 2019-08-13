@@ -278,11 +278,21 @@ int main(int argc, char* argv[])
 	struct Square s;
 	initialize(&s);
 	printSquare(&s);
-	applyClue(&s,7,1,0,1);
-	applyClue(&s,3,2,1,0);
-	applyClue(&s,2,3,1,0);
-	applyClue(&s,1,6,1,0);
-	applyClue(&s,6,6,1,1);
+	
+	applyClue(&s,7,0,0,0);
+	applyClue(&s,2,4,0,0);
+	applyClue(&s,2,5,0,0);
+	applyClue(&s,3,6,0,0);
+	
+	applyClue(&s,3,2,1,1);
+	
+	applyClue(&s,3,6,0,1);
+	applyClue(&s,3,4,0,1);
+	applyClue(&s,5,1,0,1);
+
+	applyClue(&s,5,2,1,0);
+	applyClue(&s,4,0,1,0);
+	
 	printSquare(&s);
   return 0;
 }
