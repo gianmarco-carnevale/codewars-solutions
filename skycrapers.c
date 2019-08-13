@@ -70,7 +70,7 @@ static int checkArgs(int row, int column, unsigned int value)
 
 static int isBlocked(struct Square *p, int row, int column, unsigned value)
 {
-  return (p->data[row][column] | (1<<(value-1)))?1:0;
+  return (p->data[row][column] | (1<<(value-1)))?0:1;
 }
 
 static void blockValue(struct Square *p, int row, int column, unsigned value)
@@ -114,6 +114,20 @@ int setValue(struct Square *p, int row, int column, unsigned value)
     return -1;
 }
 
+static void printValue(unsigned int value)
+{
+  int i;
+  for (i=0;i<SQUARE_SIZE;++i)
+  {
+    if (value == (1<<i))
+	{
+	  printf(" .%i ",i+1);
+	  return;
+	}
+  }
+  printf(" %02X ",value);
+}
+
 static void printSquare(struct Square *p)
 {
   int i,j;
@@ -135,9 +149,11 @@ static void printSquare(struct Square *p)
 	  printf("|\n");
 	}
     printf("|");
+	fflush(stdout);
 	for (j=0;j<SQUARE_SIZE;++j)
 	{
-	  printf(" %02x ",p->data[i][j]);
+	  printValue(p->data[i][j]);
+	  fflush(stdout);
 	}
 	printf("|\n");
 
@@ -148,6 +164,7 @@ static void printSquare(struct Square *p)
     printf("----");
   }
   printf("+\n");
+  fflush(stdout);
 }
 
 void initialize(struct Square *p)
@@ -159,6 +176,84 @@ void initialize(struct Square *p)
     for (j=0;j<SQUARE_SIZE;++j)
 	{
 	  p->data[i][j] = initValue;
+	}
+  }
+}
+
+static void applyClue(struct Square *p, unsigned int clue, int index, int isRow, int fromEnd)
+{
+  unsigned n, b, upper, lower;
+  int i;
+  if (clue==1)
+  {
+    if (isRow)
+	{
+	  if (fromEnd)
+	  {
+	    setValue(p,index,SQUARE_SIZE-1,SQUARE_SIZE);
+	  }
+	  else
+	  {
+	    setValue(p,index,0,SQUARE_SIZE);
+	  }
+	}
+	else
+	{
+	  if (fromEnd)
+	  {
+	    setValue(p,SQUARE_SIZE-1,index,SQUARE_SIZE);
+	  }
+	  else
+	  {
+	    setValue(p,0,index,SQUARE_SIZE);
+	  }
+	}
+	return;
+  }
+  if (clue==SQUARE_SIZE)
+  {
+    if (fromEnd)
+	{
+	  for (i=0;i<SQUARE_SIZE;++i)
+	  {
+	    if (isRow)
+		  setValue(p,index,i,SQUARE_SIZE-1);
+		else
+		  setValue(p,i,index,SQUARE_SIZE-1);
+	  }
+	}
+	else
+	{
+	  for (i=0;i<SQUARE_SIZE;++i)
+	  {
+	    if (isRow)
+		  setValue(p,index,i,i+1);
+		else
+		  setValue(p,i,index,i+1);
+	  }
+	}
+	return;
+  }
+  for (n=0;n<clue-1;++n)
+  {
+    lower = SQUARE_SIZE + 2 - clue + n;
+	upper = SQUARE_SIZE;
+	for (b=lower;b<=upper;++b)
+	{
+	  if (isRow)
+	  {
+	    if (fromEnd)
+			blockValue(p,index,SQUARE_SIZE-1-n,b);
+		else
+			blockValue(p,index,n,b);
+	  }
+	  else
+	  {
+	    if (fromEnd)
+			blockValue(p,SQUARE_SIZE-1-n,index,b);
+		else
+			blockValue(p,n,index,b);
+	  }
 	}
   }
 }
@@ -182,6 +277,8 @@ int main(int argc, char* argv[])
 {
 	struct Square s;
 	initialize(&s);
+	printSquare(&s);
+	applyClue(&s,7,1,0,1);
 	printSquare(&s);
   return 0;
 }
