@@ -63,7 +63,7 @@ static int checkArgs(int row, int column, unsigned int value)
     return -1;
   if (value<1)
     return -1;
-  if (value>=SQUARE_SIZE)
+  if (value>SQUARE_SIZE)
     return -1;
   return 0;
 }
@@ -217,9 +217,9 @@ static void applyClue(struct Square *p, unsigned int clue, int index, int isRow,
 	  for (i=0;i<SQUARE_SIZE;++i)
 	  {
 	    if (isRow)
-		  setValue(p,index,i,SQUARE_SIZE-1);
+		  setValue(p,index,i,SQUARE_SIZE-i);
 		else
-		  setValue(p,i,index,SQUARE_SIZE-1);
+		  setValue(p,i,index,SQUARE_SIZE-i);
 	  }
 	}
 	else
@@ -279,6 +279,10 @@ int main(int argc, char* argv[])
 	initialize(&s);
 	printSquare(&s);
 	applyClue(&s,7,1,0,1);
+	applyClue(&s,3,2,1,0);
+	applyClue(&s,2,3,1,0);
+	applyClue(&s,1,6,1,0);
+	applyClue(&s,6,6,1,1);
 	printSquare(&s);
   return 0;
 }
