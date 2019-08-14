@@ -294,13 +294,19 @@ static void getValuesToSet(int *countArray, unsigned int* valueArray)
     if (countArray[i]==1)
     {
       valueArray[j]=i+1;
-	  ++j;
+      ++j;
     }
   }
 }
 
+struct Setting
+{
+  unsigned int value;
+  int row;
+  int column;
+};
 
-static int scanSquare(struct Square *p)
+static int scanSquare(struct Square *p, struct Setting* pSettings)
 {
   int i,j,k,m,f,value,finalValues,valuesSet, mask;
   int columnCount[SQUARE_SIZE][SQUARE_SIZE];
@@ -308,94 +314,98 @@ static int scanSquare(struct Square *p)
   int minFreedom = SQUARE_SIZE;
   int r,c;
   unsigned int valueArray[SQUARE_SIZE];
-  for (;;)
+  printf("--------------------------------\n");
+  finalValues=0;
+  valuesSet=0;
+  memset(&columnCount[0][0],0,SQUARE_SIZE*SQUARE_SIZE*sizeof(int));
+  for (i=0;i<SQUARE_SIZE;++i)
   {
-    printf("--------------------------------\n");
-    finalValues=0;
-    valuesSet=0;
-    memset(&columnCount[0][0],0,SQUARE_SIZE*SQUARE_SIZE*sizeof(int));
-    for (i=0;(i<SQUARE_SIZE)&&(valuesSet==0);++i)
+    memset(&rowCount[0],0,SQUARE_SIZE*sizeof(int));
+    for (j=0;j<SQUARE_SIZE;++j)
     {
-      memset(&rowCount[0],0,SQUARE_SIZE*sizeof(int));
-      for (j=0;(j<SQUARE_SIZE)&&(valuesSet==0);++j)
+      f = getFreedom(p->data[i][j]);
+      switch (f)
       {
-        f = getFreedom(p->data[i][j]);
-        switch (f)
-        {
-          case 0:
-            return -1;
-          break;
-          case 1:
-            ++finalValues;
-          break;
-          default:
-            if (f<minFreedom)
-            {
-              minFreedom = f;
-              r = i;
-              c = j;
-            }
-          break;
-        }
-        gatherCount(rowCount,p->data[i][j]);
-        gatherCount(columnCount[j],p->data[i][j]);
-      }
-      getValuesToSet(rowCount,valueArray);
-	  printf("Row %i: ",i);
-	  for (m=0;m<SQUARE_SIZE;++m) printf("%i",valueArray[m]);
-	  printf("\n");
-      for (m=0;m<SQUARE_SIZE;++m)
-      {
-        value = valueArray[m];
-		if (value>0)
-        {
-          for (k=0;k<SQUARE_SIZE;++k)
+        case 0:
+          return -1;
+        break;
+        case 1:
+          ++finalValues;
+        break;
+        default:
+          if (f<minFreedom)
           {
-            mask = 1<<(value-1);
-            if ((p->data[i][k] & mask) && (p->data[i][k]!=mask))
-            {
-              printf("Found value %i at position [%i][%i]\n",value,i,k);
-			  /*
-              setValue(p,i,k,value);
-              ++valuesSet;
-			  */
-            }
+            minFreedom = f;
+            r = i;
+            c = j;
+          }
+        break;
+      }
+      gatherCount(rowCount,p->data[i][j]);
+      gatherCount(columnCount[j],p->data[i][j]);
+    }
+    getValuesToSet(rowCount,valueArray);
+    printf("Row %i: ",i);
+    for (m=0;m<SQUARE_SIZE;++m) printf("%i",valueArray[m]);
+    printf("\n");
+    for (m=0;m<SQUARE_SIZE;++m)
+    {
+      value = valueArray[m];
+      if (value>0)
+      {
+        for (k=0;k<SQUARE_SIZE;++k)
+        {
+          mask = 1<<(value-1);
+          if ((p->data[i][k] & mask) && (p->data[i][k]!=mask))
+          {
+            printf("Found value %i at position [%i][%i]\n",value,i,k);
+            /*
+            setValue(p,i,k,value);
+            ++valuesSet;
+            */
+            pSettings[valuesSet].value = value;
+            pSettings[valuesSet].row = i;
+            pSettings[valuesSet].column = k;
+            ++valuesSet;
           }
         }
       }
     }
-    for (i=0;i<SQUARE_SIZE;++i)
-    {
-	  getValuesToSet(columnCount[i],valueArray);
-	  printf("Column %i: ",i);
-	  for (m=0;m<SQUARE_SIZE;++m) printf("%i",valueArray[m]);
-	  printf("\n");
-	  for (m=0;m<SQUARE_SIZE;++m)
-      {
-        value = valueArray[m];
-		if (value>0)
-		{
-		  for (k=0;k<SQUARE_SIZE;++k)
-          {
-            mask = 1<<(value-1);
-            if ((p->data[k][i] & mask) && (p->data[k][i]!=mask))
-            {
-              printf("Found value %i at position [%i][%i]\n",value,k,i);
-			  /*
-              setValue(p,k,i,value);
-              ++valuesSet;
-			  */
-            }
-          }
-		}
-      }
-    }
-    if (finalValues==SQUARE_SIZE*SQUARE_SIZE)
-      return 0;
-    if (valuesSet==0)
-      return 1;
   }
-  return 1;
+  for (i=0;i<SQUARE_SIZE;++i)
+  {
+    getValuesToSet(columnCount[i],valueArray);
+    printf("Column %i: ",i);
+    for (m=0;m<SQUARE_SIZE;++m) printf("%i",valueArray[m]);
+    printf("\n");
+    for (m=0;m<SQUARE_SIZE;++m)
+    {
+      value = valueArray[m];
+      if (value>0)
+      {
+        for (k=0;k<SQUARE_SIZE;++k)
+        {
+          mask = 1<<(value-1);
+          if ((p->data[k][i] & mask) && (p->data[k][i]!=mask))
+          {
+            printf("Found value %i at position [%i][%i]\n",value,k,i);
+            /*
+            setValue(p,k,i,value);
+            ++valuesSet;
+            */
+            pSettings[valuesSet].value = value;
+            pSettings[valuesSet].row = k;
+            pSettings[valuesSet].column = i;
+            ++valuesSet;
+          }
+        }
+      }
+    }
+  }
+  if (finalValues==SQUARE_SIZE*SQUARE_SIZE)
+    return 0;
+  return valuesSet;
+
 }
 
 static int getParams(int position, int* pIndex, int* pIsRow, int* pFromEnd)
@@ -451,9 +461,12 @@ int applyClueArray(int* array, struct Square* p)
   return 0;
 }
 
+static struct Setting sett[20];
+
 int main(int argc, char* argv[])
 {
     struct Square s;
+    int count,i;
     int clues[SQUARE_SIZE * 4] = {7, 0, 0, 0, 2, 2, 3,
                                   0, 0, 3, 0, 0, 0, 0,
                                   3, 0, 3, 0, 0, 5, 0,
@@ -461,7 +474,14 @@ int main(int argc, char* argv[])
     initialize(&s);
     applyClueArray(clues,&s);
     printSquare(&s);
-    scanSquare(&s);
+    count = scanSquare(&s,sett);
+    printf("Count==%i\n",count);
+    
+    for (i=0;i<count;++i)
+    {
+      setValue(&s,sett[i].row,sett[i].column,sett[i].value);
+    }
+    
     printSquare(&s);
   return 0;
 }
