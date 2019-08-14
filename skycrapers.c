@@ -436,6 +436,7 @@ int main(int argc, char* argv[])
     initialize(&s);
     applyClueArray(clues,&s);
     printSquare(&s);
-
+    scanSquare(&s);
+	printSquare(&s);
   return 0;
 }
