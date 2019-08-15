@@ -86,7 +86,7 @@ static void blockValue(struct Square *p, int row, int column, unsigned value)
   }
 }
 
-void setValue(struct Square *p, int row, int column, unsigned value)
+void setValue(struct Square *p, unsigned int value, int row, int column)
 {
   int i;
   if (checkArgs(row,column,value)==0)
@@ -108,7 +108,6 @@ void setValue(struct Square *p, int row, int column, unsigned value)
           blockValue(p,row,i,value);
         }
       }
-      printf("Done\n");
     }
     else
       printf("Not available\n");
@@ -201,7 +200,7 @@ void initialize(struct Square *p)
   }
 }
 
-static void applyClue(struct Square *p, unsigned int clue, int index, int isRow, int fromEnd)
+static void applyClue(struct Square *p, unsigned int clue, int index, int isRow, int reversed)
 {
   unsigned n, b, upper, lower;
   int i;
@@ -211,38 +210,38 @@ static void applyClue(struct Square *p, unsigned int clue, int index, int isRow,
   {
     if (isRow)
     {
-      if (fromEnd)
+      if (reversed)
       {
-        setValue(p,index,SQUARE_SIZE-1,SQUARE_SIZE);
+        setValue(p,SQUARE_SIZE,index,SQUARE_SIZE-1);
       }
       else
       {
-        setValue(p,index,0,SQUARE_SIZE);
+        setValue(p,SQUARE_SIZE,index,0);
       }
     }
     else
     {
-      if (fromEnd)
+      if (reversed)
       {
-        setValue(p,SQUARE_SIZE-1,index,SQUARE_SIZE);
+        setValue(p,SQUARE_SIZE,SQUARE_SIZE-1,index);
       }
       else
       {
-        setValue(p,0,index,SQUARE_SIZE);
+        setValue(p,SQUARE_SIZE,0,index);
       }
     }
     return;
   }
   if (clue==SQUARE_SIZE)
   {
-    if (fromEnd)
+    if (reversed)
     {
       for (i=0;i<SQUARE_SIZE;++i)
       {
         if (isRow)
-          setValue(p,index,i,SQUARE_SIZE-i);
+          setValue(p,SQUARE_SIZE-i,index,i);
         else
-          setValue(p,i,index,SQUARE_SIZE-i);
+          setValue(p,SQUARE_SIZE-i,i,index);
       }
     }
     else
@@ -250,9 +249,9 @@ static void applyClue(struct Square *p, unsigned int clue, int index, int isRow,
       for (i=0;i<SQUARE_SIZE;++i)
       {
         if (isRow)
-          setValue(p,index,i,i+1);
+          setValue(p,i+1,index,i);
         else
-          setValue(p,i,index,i+1);
+          setValue(p,i+1,i,index);
       }
     }
     return;
@@ -265,14 +264,14 @@ static void applyClue(struct Square *p, unsigned int clue, int index, int isRow,
     {
       if (isRow)
       {
-        if (fromEnd)
+        if (reversed)
             blockValue(p,index,SQUARE_SIZE-1-n,b);
         else
             blockValue(p,index,n,b);
       }
       else
       {
-        if (fromEnd)
+        if (reversed)
             blockValue(p,SQUARE_SIZE-1-n,index,b);
         else
             blockValue(p,n,index,b);
@@ -421,7 +420,7 @@ static int scanSquare(struct Square *p, struct Setting* pSettings)
   return valuesSet;
 }
 
-static int getParams(int position, int* pIndex, int* pIsRow, int* pFromEnd)
+static int getParams(int position, int* pIndex, int* pIsRow, int* pReversed)
 {
   int x, y;
   if (position<0)
@@ -435,22 +434,22 @@ static int getParams(int position, int* pIndex, int* pIsRow, int* pFromEnd)
     case 0:
       pIndex[0]   = y;
       pIsRow[0]   = 0;
-      pFromEnd[0] = 0;
+      pReversed[0] = 0;
     break;        
     case 1:       
       pIndex[0]   = y;
       pIsRow[0]   = 1;
-      pFromEnd[0] = 1;
+      pReversed[0] = 1;
     break;        
     case 2:       
       pIndex[0]   = SQUARE_SIZE - 1 - y;
       pIsRow[0]   = 0;
-      pFromEnd[0] = 1;
+      pReversed[0] = 1;
     break;        
     case 3:       
       pIndex[0]   = SQUARE_SIZE - 1 - y;
       pIsRow[0]   = 1;
-      pFromEnd[0] = 0;
+      pReversed[0] = 0;
     break;
     default:
       return -1;
@@ -461,12 +460,12 @@ static int getParams(int position, int* pIndex, int* pIsRow, int* pFromEnd)
 
 int applyClueArray(int* array, struct Square* p)
 {
-  int i, index, isRow, fromEnd;
+  int i, index, isRow, reversed;
   for (i=0;i<4*SQUARE_SIZE;++i)
   {
-    if (getParams(i,&index,&isRow,&fromEnd)==0)
+    if (getParams(i,&index,&isRow,&reversed)==0)
     {
-      applyClue(p,array[i],index,isRow,fromEnd);
+      applyClue(p,array[i],index,isRow,reversed);
     }
     else
       return -1;
@@ -474,7 +473,24 @@ int applyClueArray(int* array, struct Square* p)
   return 0;
 }
 
-static struct Setting sett[20];
+
+/*
+ sequence of 1 or more specific value settings, each with value, row, column
+ sequence of 1 or more trial contexts, each
+
+
+*/
+
+
+struct SquareScan
+{
+  int result; /* -1: error, 0: finished, 1: values to be set, 2: trials to be done */
+  unsigned int length; /* this field must be zero when the type is equal to 0 or 1 */
+  struct Setting* pSettings; /* this pointer must be NULL when type is equal to 0 or 1 */
+};
+
+#define MAX_SETTINGS_NUMBER  (SQUARE_SIZE * SQUARE_SIZE)
+static struct Setting localSettingArray[MAX_SETTINGS_NUMBER];
 
 int main(int argc, char* argv[])
 {
@@ -505,7 +521,7 @@ int main(int argc, char* argv[])
 	  {
         for (i=0;i<count;++i)
         {
-          setValue(&s,sett[i].row,sett[i].column,sett[i].value);
+          setValue(&s,sett[i].value,sett[i].row,sett[i].column);
         }
 	  }
     }
