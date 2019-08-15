@@ -38,6 +38,9 @@ static int expected[][SIZE][SIZE] = {
     { 5, 3, 1, 2, 6, 4, 7 },
     { 6, 2, 7, 3, 1, 5, 4 },
     { 7, 1, 2, 4, 5, 6, 3 } },
+	
+	
+	
   { { 7, 6, 2, 1, 5, 4, 3 },
     { 1, 3, 5, 4, 2, 7, 6 },
     { 6, 5, 4, 7, 3, 2, 1 },
@@ -128,44 +131,62 @@ static void printValue(unsigned int value)
   printf(" %02X ",value);
 }
 
-static void printSquare(struct Square *p)
+static char getClue(int* clueArray, int pos)
 {
-  int i,j;
-  printf("+");
-  for (i=0;i<SQUARE_SIZE;++i)
-  {
-    printf("----");
-  }
-  printf("+\n");
-  for (i=0;i<SQUARE_SIZE;++i)
-  {
-    if (i>0)
-    {
-      printf("|");
-      for (j=0;j<SQUARE_SIZE;++j)
-      {
-        printf("    ");
-      }
-      printf("|\n");
-    }
-    printf("|");
-    fflush(stdout);
-    for (j=0;j<SQUARE_SIZE;++j)
-    {
-      printValue(p->data[i][j]);
-      fflush(stdout);
-    }
-    printf("|\n");
-
-  }
-  printf("+");
-  for (i=0;i<SQUARE_SIZE;++i)
-  {
-    printf("----");
-  }
-  printf("+\n");
-  fflush(stdout);
+  if (clueArray==NULL)
+    return ' ';
+  if (clueArray[pos]>0)
+    return ('0' + clueArray[pos]);
+  return ' ';
 }
+
+static void printSquare(struct Square *p, int* clueArray)
+{
+  int column, row;
+  printf("\n     ");
+  for (column=0;column<SQUARE_SIZE;++column)
+  {
+    printf("%c   ",getClue(clueArray,column));
+  }
+  printf("\n  +");
+  for (column=0;column<SQUARE_SIZE;++column)
+  {
+    printf("----");
+  }
+  printf("-+\n");
+  for (row=0;row<SQUARE_SIZE;++row)
+  {
+    if (row>0)
+	{
+	  printf("  | ");
+	  for (column=0;column<SQUARE_SIZE;++column)
+	  {
+	    printf("    ");
+	  }
+	  printf("|\n");
+	}
+	printf("%c |",getClue(clueArray,4*SQUARE_SIZE-1-row));
+	for (column=0;column<SQUARE_SIZE;++column)
+	{
+	  printValue(p->data[row][column]);
+	}
+	printf(" | %c\n",getClue(clueArray,SQUARE_SIZE+row));
+  }
+  printf("  +");
+  for (column=0;column<SQUARE_SIZE;++column)
+  {
+    printf("----");
+  }
+  printf("-+\n");
+  printf("     ");
+  for (column=0;column<SQUARE_SIZE;++column)
+  {
+    printf("%c   ",getClue(clueArray,3*SQUARE_SIZE-1-column));
+  }
+  printf("\n");
+}
+
+
 
 void initialize(struct Square *p)
 {
@@ -359,10 +380,6 @@ static int scanSquare(struct Square *p, struct Setting* pSettings)
           if ((p->data[i][k] & mask) && (p->data[i][k]!=mask))
           {
             printf("Found value %i at position [%i][%i]\n",value,i,k);
-            /*
-            setValue(p,i,k,value);
-            ++valuesSet;
-            */
             pSettings[valuesSet].value = value;
             pSettings[valuesSet].row = i;
             pSettings[valuesSet].column = k;
@@ -389,10 +406,6 @@ static int scanSquare(struct Square *p, struct Setting* pSettings)
           if ((p->data[k][i] & mask) && (p->data[k][i]!=mask))
           {
             printf("Found value %i at position [%i][%i]\n",value,k,i);
-            /*
-            setValue(p,k,i,value);
-            ++valuesSet;
-            */
             pSettings[valuesSet].value = value;
             pSettings[valuesSet].row = k;
             pSettings[valuesSet].column = i;
@@ -404,8 +417,8 @@ static int scanSquare(struct Square *p, struct Setting* pSettings)
   }
   if (finalValues==SQUARE_SIZE*SQUARE_SIZE)
     return 0;
+  
   return valuesSet;
-
 }
 
 static int getParams(int position, int* pIndex, int* pIsRow, int* pFromEnd)
@@ -467,21 +480,35 @@ int main(int argc, char* argv[])
 {
     struct Square s;
     int count,i;
+	/*
     int clues[SQUARE_SIZE * 4] = {7, 0, 0, 0, 2, 2, 3,
                                   0, 0, 3, 0, 0, 0, 0,
                                   3, 0, 3, 0, 0, 5, 0,
                                   0, 0, 0, 0, 5, 0, 4};
+								  */
+	int clues[SQUARE_SIZE * 4] =  { 0, 2, 3, 0, 2, 0, 0,
+    5, 0, 4, 5, 0, 4, 0,
+    0, 4, 2, 0, 0, 0, 6,
+    5, 2, 2, 2, 2, 4, 1 };
     initialize(&s);
     applyClueArray(clues,&s);
-    printSquare(&s);
-    count = scanSquare(&s,sett);
-    printf("Count==%i\n",count);
-    
-    for (i=0;i<count;++i)
-    {
-      setValue(&s,sett[i].row,sett[i].column,sett[i].value);
+    printSquare(&s,clues);
+	while(1)
+	{
+      count = scanSquare(&s,sett);
+      printf("Count==%i\n",count);
+      if (count==0)
+	  {
+	    break;
+	  }
+	  else
+	  {
+        for (i=0;i<count;++i)
+        {
+          setValue(&s,sett[i].row,sett[i].column,sett[i].value);
+        }
+	  }
     }
-    
-    printSquare(&s);
+    printSquare(&s,clues);
   return 0;
 }
