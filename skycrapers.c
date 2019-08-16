@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define  SQUARE_SIZE  4
+#define  SQUARE_SIZE  7
 
 struct Square
 {
@@ -472,104 +472,72 @@ static int checkClues(struct Square *p, int* clues)
   /*--------------------- from the top ------------------------*/
   for (c=0;c<SQUARE_SIZE;++c,++index)
   {
-    for (count=0,r=0;(r<SQUARE_SIZE)&&(clues[index]>0);++r)
+    for (last=0,count=0,r=0;(r<SQUARE_SIZE)&&(clues[index]>0);++r)
     {
       value = getValueFromMask(p->data[r][c]);
-      if (r==0)
+      if (value>last)
       {
-        count=1;
+        ++count;
         last = value;
-      }
-      else
-      {
-        if (value>last)
-        {
-          ++count;
-          last = value;
-        }
       }
     }
     if (clues[index]!=count)
     {
-      printf("Top, column %i, got %i instead of %i\n",c,count,clues[index]);
+      /*printf("Top, column %i, got %i instead of %i\n",c,count,clues[index]);*/
       return -1;
     }
   }
   /*--------------------- from the right ------------------------*/
   for (r=0;r<SQUARE_SIZE;++r,++index)
   {
-    for (count=0,c=SQUARE_SIZE-1;(c>=0)&&(clues[index]>0);--c)
+    for (last=0,count=0,c=SQUARE_SIZE-1;(c>=0)&&(clues[index]>0);--c)
     {
       value = getValueFromMask(p->data[r][c]);
-      if (c==SQUARE_SIZE-1)
+      if (value>last)
       {
-        count=1;
+        ++count;
         last = value;
-      }
-      else
-      {
-        if (value>last)
-        {
-          ++count;
-          last = value;
-        }
       }
     }
     if (clues[index]!=count)
     {
-      printf("Right, row %i, got %i instead of %i\n",r,count,clues[index]);
+      /*printf("Right, row %i, got %i instead of %i\n",r,count,clues[index]);*/
       return -1;
     }
   }
   /*--------------------- from the bottom ------------------------*/
   for (c=SQUARE_SIZE-1;c>=0;--c,++index)
   {
-    for (count=0,r=SQUARE_SIZE-1;(r>=0)&&(clues[index]>0);--r)
+    for (last=0,count=0,r=SQUARE_SIZE-1;(r>=0)&&(clues[index]>0);--r)
     {
       value = getValueFromMask(p->data[r][c]);
-      if (r==SQUARE_SIZE-1)
+      if (value>last)
       {
-        count=1;
+        ++count;
         last = value;
-      }
-      else
-      {
-        if (value>last)
-        {
-          ++count;
-          last = value;
-        }
       }
     }
     if (clues[index]!=count)
     {
-      printf("Bottom, column %i, got %i instead of %i\n",c,count,clues[index]);
+      /*printf("Bottom, column %i, got %i instead of %i\n",c,count,clues[index]);*/
       return -1;
     }
   }
   /*--------------------- from the left ------------------------*/
   for (r=SQUARE_SIZE-1;r>=0;--r,++index)
   {
-    for (count=0,c=0;(c<SQUARE_SIZE)&&(clues[index]>0);++c)
+    for (last=0,count=0,c=0;(c<SQUARE_SIZE)&&(clues[index]>0);++c)
     {
       value = getValueFromMask(p->data[r][c]);
-      if (c==0)
+      if (value>last)
       {
-        count=1;
+        ++count;
         last = value;
-      }
-      else
-      {
-        if (p->data[r][c]>last)
-        {
-          ++count;
-          last = value;
-        }
       }
     }
     if (clues[index]!=count)
     {
-      printf("Left, row %i, got %i instead of %i\n",r,count,clues[index]);
+      /*printf("Left, row %i, got %i instead of %i\n",r,count,clues[index]);*/
       return -1;
     }
   }
@@ -592,6 +560,8 @@ static void scanSquare(struct Square *p, struct SquareScan* pScan, int* clues)
   */
   finalValues=0;
   memset(&columnCount[0][0],0,SQUARE_SIZE*SQUARE_SIZE*sizeof(int));
+  r=-1;
+  c=-1;
   for (i=0;i<SQUARE_SIZE;++i)
   {
     memset(&rowCount[0],0,SQUARE_SIZE*sizeof(int));
@@ -626,6 +596,7 @@ static void scanSquare(struct Square *p, struct SquareScan* pScan, int* clues)
     for (m=0;m<SQUARE_SIZE;++m) printf("%i",valueArray[m]);fflush(stdout);
     printf("\n");fflush(stdout);
     */
+	/*---- let's check if we have values to set on the single row  ---*/
     for (m=0;m<numValuesToSet;++m)
     {
       value = valueArray[m];
@@ -648,12 +619,14 @@ static void scanSquare(struct Square *p, struct SquareScan* pScan, int* clues)
       }
     }
   }
+  /*---- we scanned the array, if this is a final configuration we check it ---*/
   if (finalValues==SQUARE_SIZE*SQUARE_SIZE)
   {
     clearScan(pScan);
     pScan->result = checkClues(p,clues);
     return;
   }
+  /*---- let's check if we have values to set on the columns ---*/
   for (i=0;i<SQUARE_SIZE;++i)
   {
     getValuesToSet(columnCount[i],valueArray);
@@ -689,9 +662,11 @@ static void scanSquare(struct Square *p, struct SquareScan* pScan, int* clues)
   }
   if (pScan->length>0)
   {
-    pScan->result = 1;
+	pScan->result = 1;
     return;
   }
+  if (pScan->settingList)
+	printf("ERROR: settingList\n");
   pScan->result = 2;
   for (i=0;i<SQUARE_SIZE;++i)
   {
@@ -719,7 +694,6 @@ int recursiveSolve(struct Square* pSquare, int* clues)
   int i;
   for (;;)
   {
-    clearScan(&scan);
     scanSquare(pSquare,&scan,clues);
     /*
     printf("res==%i\n",scan.result);fflush(stdout);
@@ -783,8 +757,8 @@ int** SolvePuzzle(int* clues)
   applyClueArray(clues,&s);
   if (recursiveSolve(&s,clues)==0)
   {
-    printSquare(&s,clues);
-    result = (int**)malloc(SQUARE_SIZE*sizeof(int*));
+      printSquare(&s,clues);
+	result = (int**)malloc(SQUARE_SIZE*sizeof(int*));
     if (result==NULL)
     {
       printf("ERROR: result malloc\n");
@@ -842,41 +816,33 @@ int main(int argc, char* argv[])
     5, 2, 4, 5, 0, 4, 1,
     0, 4, 2, 3, 0, 0, 6,
     5, 2, 2, 2, 2, 4, 1 };
+#elif SQUARE_SIZE==6
+ static int clues[SQUARE_SIZE * 4] ={
+    3, 2, 2, 3, 2, 1,
+    1, 2, 3, 3, 2, 2,
+    5, 1, 2, 2, 4, 3,
+    3, 2, 1, 2, 2, 4 };
+    5, 2, 2, 2, 2, 4, 1 };
+#elif SQUARE_SIZE==5
+static int clues[SQUARE_SIZE * 4] =
+{
+  2, 2, 2, 3, 1,  1, 3, 4, 2, 2,   3, 1, 4, 2, 2,   2, 1, 2, 3, 3 
+};
+/*
+   3, 4, 2, 1, 5,
+   1, 3, 5, 4, 2,
+   2, 5, 4, 3, 1,
+   5, 1, 3, 2, 4,
+   4, 2, 1, 5, 3,
+
+
+*/
 #elif SQUARE_SIZE==4
     int clues[SQUARE_SIZE * 4]= {  0, 0, 1, 2,   
   0, 2, 0, 0,   
   0, 3, 0, 0, 
   0, 1, 0, 0 };
   
-  /*
-  
-{ { 2, 1, 4, 3 }, 
-  { 3, 4, 1, 2 }, 
-  { 4, 2, 3, 1 }, 
-  { 1, 3, 2, 4 } }
-  
-  */
-  
-  
-  /*
-{ { 1, 3, 4, 2 },       
-  { 4, 2, 1, 3 },       
-  { 3, 4, 2, 1 },
-  { 2, 1, 3, 4 } },
-  
-  +-----------------+
-  | .1  .3  .4  .2  |  
-  |                 |
-  | .4  .2  .1  .3  |  
-  |                 |
-  | .3  .4  .2  .1  |  
-  |                 |
-  | .2  .1  .3  .4  |  
-  +-----------------+
-  
-  
-  
-  */
 #endif
     SolvePuzzle(clues);
     
