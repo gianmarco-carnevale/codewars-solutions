@@ -50,6 +50,22 @@ static int expected[][SIZE][SIZE] = {
     { 2, 4, 3, 5, 6, 1, 7 } }
 };
 
+  +-----------------------------+
+  | .7  .6  .2  .1  .5  .4  .3  |  
+  |                             |
+  | .1  .3  .5  .4  .2  .7  .6  |  
+  |                             |
+  | .6  .5  .4  .7  .3  .2  .1  |  
+  |                             |
+  | .5  .1  .7  .6  .4  .3  .1  |  
+  |                             |
+  | .4  .2  .1  .3  .7  .6  .5  |  
+  |                             |
+  | .3  .7  .6  .2  .1  .5  .4  |  
+  |                             |
+  | .2  .4  .3  .5  .6  .1  .7  |  
+  +-----------------------------+
+
 
 */
 
@@ -121,7 +137,9 @@ void setValue(struct Square *p, unsigned int value, int row, int column)
       }
     }
     else
-      printf("Value %d not available at row %i column %i\n",value,row,column);
+	{
+	  /*printf("Value %d not available at row %i column %i\n",value,row,column);*/
+	}
   }
   else
     printf("Bad arguments: %d,%i,%i\n",value,row,column);
@@ -446,8 +464,106 @@ static int addSetting(struct SquareScan* pScan, struct Setting* pSetting)
   }
 }
 
+static int checkClues(struct Square *p, int* clues)
+{
+  int r,c,count,last,index;
+  unsigned int value;
+  /*--------------------- from the top ------------------------*/
+  for (c=0;c<SQUARE_SIZE;++c,++index)
+  {
+	for (count=0,r=0;(r<SQUARE_SIZE)&&(clues[index]>0);++r)
+	{
+      value = getValueFromMask(p->data[r][c]);
+	  if (r==0)
+      {
+        count=1;
+		last = value;
+      }
+      else
+      {
+        if (value>last)
+        {
+          ++count;
+		  last = value;
+        }
+      }
+	}
+	if (clues[index]!=count)
+	  return -1;
+  }
+  /*--------------------- from the right ------------------------*/
+  for (r=0;r<SQUARE_SIZE;++r,++index)
+  {
+	for (count=0,c=SQUARE_SIZE-1;(c>=0)&&(clues[index]>0);--c)
+	{
+      value = getValueFromMask(p->data[r][c]);
+	  if (c==0)
+      {
+        count=1;
+		last = value;
+      }
+      else
+      {
+        if (value>last)
+        {
+          ++count;
+		  last = value;
+        }
+      }
+	}
+	if (clues[index]!=count)
+	  return -1;
+  }
+  /*--------------------- from the bottom ------------------------*/
+  for (c=SQUARE_SIZE-1;c>=0;--c,++index)
+  {
+	for (count=0,r=SQUARE_SIZE-1;(r>=0)&&(clues[index]>0);--r)
+	{
+      value = getValueFromMask(p->data[r][c]);
+	  if (r==0)
+      {
+        count=1;
+		last = value;
+      }
+      else
+      {
+        if (value>last)
+        {
+          ++count;
+		  last = value;
+        }
+      }
+	}
+	if (clues[index]!=count)
+	  return -1;
+  }
+  /*--------------------- from the left ------------------------*/
+  for (r=SQUARE_SIZE-1;r>=0;--r,++index)
+  {
+	for (count=0,c=0;(c<SQUARE_SIZE)&&(clues[index]>0);++c)
+	{
+      value = getValueFromMask(p->data[r][c]);
+	  if (c==0)
+      {
+        count=1;
+		last = value;
+      }
+      else
+      {
+        if (p->data[r][c]>last)
+        {
+          ++count;
+		  last = value;
+        }
+      }
+	}
+	if (clues[index]!=count)
+	  return -1;
+  }
+  return 0;
+}
 
-static void scanSquare(struct Square *p, struct SquareScan* pScan)
+static void scanSquare(struct Square *p, struct SquareScan* pScan, int* clues)
 {
   int i,j,k,m,f,value,finalValues,valuesSet, mask;
   int columnCount[SQUARE_SIZE][SQUARE_SIZE];
@@ -505,7 +621,7 @@ static void scanSquare(struct Square *p, struct SquareScan* pScan)
         mask = 1<<(value-1);
         if ((p->data[i][k] & mask) && (p->data[i][k]!=mask))
         {
-          printf("Found value %i at position [%i][%i]\n",value,i,k);fflush(stdout);
+          /*printf("Found value %i at position [%i][%i]\n",value,i,k);fflush(stdout);*/
           setting.value = value;
           setting.row = i;
           setting.column = k;
@@ -522,7 +638,7 @@ static void scanSquare(struct Square *p, struct SquareScan* pScan)
   if (finalValues==SQUARE_SIZE*SQUARE_SIZE)
   {
     clearScan(pScan);
-    pScan->result = 0;
+	pScan->result = checkClues(p,clues);
     return;
   }
   for (i=0;i<SQUARE_SIZE;++i)
@@ -543,7 +659,7 @@ static void scanSquare(struct Square *p, struct SquareScan* pScan)
           mask = 1<<(value-1);
           if ((p->data[k][i] & mask) && (p->data[k][i]!=mask))
           {
-            printf("Found value %i at position [%i][%i]\n",value,k,i);
+            /*printf("Found value %i at position [%i][%i]\n",value,k,i);*/
             setting.value = value;
             setting.row = k;
             setting.column = i;
@@ -571,7 +687,7 @@ static void scanSquare(struct Square *p, struct SquareScan* pScan)
 	  setting.value = i+1;
       setting.row = r;
       setting.column = c;
-	  printf("candidate value %i at [%i][%i] with degree %d\n",i+1,r,c,getFreedom(p->data[r][c]));
+	  /*printf("candidate value %i at [%i][%i] with degree %d\n",i+1,r,c,getFreedom(p->data[r][c]));*/
       if (addSetting(pScan,&setting))
       {
         clearScan(pScan);
@@ -583,7 +699,7 @@ static void scanSquare(struct Square *p, struct SquareScan* pScan)
 }
 
 
-int recursiveSolve(struct Square* pSquare)
+int recursiveSolve(struct Square* pSquare, int* clues)
 {
   struct SquareScan scan = {-1,0,NULL};
   struct Square local;
@@ -591,7 +707,7 @@ int recursiveSolve(struct Square* pSquare)
   for (loop=1;loop;)
   {
     printSquare(pSquare,NULL);
-	scanSquare(pSquare,&scan);
+	scanSquare(pSquare,&scan,clues);
 	/*
 	printf("res==%i\n",scan.result);fflush(stdout);
 	*/
@@ -617,21 +733,23 @@ int recursiveSolve(struct Square* pSquare)
 		  for (i=0;i<scan.length;++i)
 		  {
 			memcpy(&local,pSquare,sizeof(struct Square));
-			printf("Let's try value %i at [%i][%i] ... ",scan.settingList[i].value,scan.settingList[i].row,scan.settingList[i].column);
+			/*printf("Let's try value %i at [%i][%i] ... ",scan.settingList[i].value,scan.settingList[i].row,scan.settingList[i].column);*/
 			setValue(&local,scan.settingList[i].value,scan.settingList[i].row,scan.settingList[i].column);
 			/*printSquare(pSquare,NULL);fflush(stdout);*/
-			if (recursiveSolve(&local)==0)
+			if (recursiveSolve(&local,clues)==0)
 			{
 			  printf("yessss!!!\n");
 			  memcpy(pSquare,&local,sizeof(struct Square));
-			  /*printSquare(pSquare,NULL);*/
+			  printSquare(pSquare,NULL);
+			  clearScan(&scan);
 			  return 0;
 			}
 			else
-			  printf("no, didn't work, let's try another\n");
-			
+			{
+			  /*printf("no, didn't work, let's try another\n");*/
+			}
 		  }
-		  printf("... I don't know ....\n");
+		  /*printf("Bad candidate in the first place\n");*/
 		  return -1;
       break;
       default:
@@ -650,11 +768,13 @@ int solve(int* clues)
   struct Square s;
   initialize(&s);
   applyClueArray(clues,&s);
-  result = recursiveSolve(&s);
+  result = recursiveSolve(&s,clues);
   if (result==0)
   {
     printSquare(&s,clues);
   }
+  else
+    printf("Aw .... no solution found ...\n");
   return result;
 }
 
@@ -671,9 +791,19 @@ int main(int argc, char* argv[])
                                   3, 0, 3, 0, 0, 5, 0,
                                   0, 0, 0, 0, 5, 0, 4};
                                   */
-    int clues[SQUARE_SIZE * 4] =  { 0, 2, 3, 0, 2, 0, 0,
-    5, 0, 4, 5, 0, 4, 0,
-    0, 4, 2, 0, 0, 0, 6,
+	/*
+  { { 7, 6, 2, 1, 5, 4, 3 },
+    { 1, 3, 5, 4, 2, 7, 6 },
+    { 6, 5, 4, 7, 3, 2, 1 },
+    { 5, 1, 7, 6, 4, 3, 2 },
+    { 4, 2, 1, 3, 7, 6, 5 },
+    { 3, 7, 6, 2, 1, 5, 4 },
+    { 2, 4, 3, 5, 6, 1, 7 } }
+	
+	*/
+    int clues[SQUARE_SIZE * 4] =  { 0, 2, 3, 3, 2, 2, 3,
+    5, 2, 4, 5, 0, 4, 1,
+    0, 4, 2, 3, 0, 0, 6,
     5, 2, 2, 2, 2, 4, 1 };
 	solve(clues);
     
