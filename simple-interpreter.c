@@ -73,7 +73,30 @@ static struct IdentifierList* iList = NULL;
 static unsigned int iLength = 0;
 static int addId(char* newName)
 {
-  
+  if (newName==NULL)
+	return -1;
+  if (strlen(newName)==0)
+	return -1;
+  if (iList==NULL)
+  {
+    iList = (struct IdentifierList*)malloc(sizeof(struct IdentifierList));
+  }
+  else
+  {
+    iList = (struct IdentifierList*)realloc(iList,(iLength+1)*sizeof(struct IdentifierList));
+  }
+  if (iList==NULL)
+  {
+    return -1;
+  }
+  iList[iLength]->name = (char*)malloc(sizeof(char)*(1+strlen(newName)));
+  if (iList[iLength]->name==NULL)
+  {
+	return -1;
+  }
+  strcpy(iList[iLength]->name,newName);
+  ++iLength;
+  return 0;
 }
 
 static int findId(char* newName)
@@ -87,7 +110,7 @@ static int findId(char* newName)
   return -1;
 }
 
-static void clearList()
+static void clearIdList()
 {
   int i;
   for (i=0;i<iLength;++i)
@@ -117,6 +140,31 @@ struct Token
   union TokenUnion uToken;
 };
 
+static unsigned int tLength = 0;
+static struct Token* tList = NULL;
+
+static int addToken(const struct Token* p)
+{
+  if (p==NULL)
+	return -1;
+  if (tList==NULL)
+  {
+    tList = (struct Token*)malloc(sizeof(struct Token));
+  }
+  else
+  {
+    tList = (struct Token*)realloc(tList,(tLength+1)*sizeof(struct Token));
+  }
+  if (tList==NULL)
+  {
+    return -1;
+  }
+  memcpy(&tList[tLength],p,sizeof(struct Token));
+  ++tLength;
+  return 0;
+}
+
+
 static int isIdChar(char c)
 {
   if (isalpha(c))
@@ -135,12 +183,66 @@ static int isNumeric(char c)
   return 0;
 }
 
+static int getNumber(char* s, struct Token *p)
+{
+  char *end;
+  float f;
+  long l;
+  if (strchr(s,'.')==NULL)
+  {
+    l = strtol(s,&end,10);
+	if (end[0]==0)
+	{
+	  p->type = TOKEN_NUMBER;
+	  p->uToken.sNumber.type = NUMBER_INTEGER;
+	  p->uToken.sNumber.uNumber.intValue = l;
+	  return 0;
+	}
+	return -1;
+  }
+  else
+  {
+    f = strtod(s,&end);
+	if (end[0]==0)
+	{
+	  p->type = TOKEN_NUMBER;
+	  p->uToken.sNumber.type = NUMBER_FLOAT;
+	  p->uToken.sNumber.uNumber.flValue = f;
+	  return 0;
+	}
+	return -1;
+  }
+  return -1;
+}
+
+static int getIdentifier(char* s, struct Token *p)
+{
+  int temp;
+  temp = findId(s);
+  if (temp==-1)
+  {
+	temp = addId(s);
+	if (temp==-1)
+	  return -1;
+	p->type = TOKEN_IDENTIFIER;
+	p->uToken.sIdentifier.id = temp;
+	return 0;
+  }
+  else
+  {
+    p->type = TOKEN_IDENTIFIER;
+	p->uToken.sIdentifier.id = temp;
+	return 0;
+  }
+}
+
 static int parseString(char* input)
 {
   int state;
   char c;
   char tokenString[64];
   int tokenIndex;
+  Token singleToken;
   for (state=0,tokenIndex=0;;)
   {
     c = input[0];
@@ -166,7 +268,7 @@ static int parseString(char* input)
           else
           {
             if (c==0)
-              state=4;/* end processing  */
+              return 0;
             else
               state=3;/* getting symbols */
           }
@@ -184,7 +286,7 @@ static int parseString(char* input)
           /* process the new identifier */
           tokenIndex=0;
           if (c==0)
-            state=4;/* end processing  */
+            return 0;
           else
             state=0;/* let's look for the next token */
         }
@@ -201,45 +303,45 @@ static int parseString(char* input)
           /* process the new number */
           tokenIndex=0;
           if (c==0)
-            state=4;/* end processing  */
+            return 0;
           else
             state=0;/* let's look for the next token */
         }
       break;
       case 3:
+		state=0;
         switch (c)
         {
-          case ' ':
-			++input;
-		  break;
+          case ' ':break;
           case '=':
-			++input;
+
 		  break;
           case '+':
-			++input;
+
 		  break;
           case '-':
-			++input;
+
 		  break;
           case '*':
-			++input;
+
 		  break;
           case '/':
-			++input;
+
 		  break;
           case '%':
-			++input;
+
 		  break;
           case '(':
-			++input;
+
 		  break;
           case ')':
-			++input;
+
 		  break;
           default:
-			++input;
+			return -1;
 		  break;
         }
+		++input;
       break;
       case 4:
 		return 0;
