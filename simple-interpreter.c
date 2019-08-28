@@ -20,13 +20,15 @@
 #define TOKEN_NUMBER_INTEGER      1
 #define TOKEN_NUMBER_FLOAT        (TOKEN_NUMBER_INTEGER+1)
 /*------------------------------------------------------------------------------------------------------*/
-struct TokenStruct;
+union NumberUnion;
+union TokenUnion;
+struct NumberStruct;
 struct IdentifierStruct;
 struct OperatorStruct;
 struct BracketStruct;
-struct NumberStruct;
-union NumberUnion;
-union TokenUnion;
+struct Token;
+struct IdentifierData;
+struct IdentifierList;
 /*--------------------------------------------------------*/
 union NumberUnion
 {
@@ -75,7 +77,7 @@ struct Token
   union TokenUnion uToken;
 };
 
-/*------------------------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------*/
 struct IdentifierData
 {
   char* name;
@@ -88,6 +90,13 @@ struct IdentifierList
 {
   unsigned int length;
   struct IdentifierData* list;
+};
+
+/*--------------------------------------------------------*/
+struct TokenList
+{
+  unsigned int length;
+  struct Token* list;
 };
 
 /*--------------------------------------------------------*/
@@ -112,12 +121,14 @@ static int addId(struct IdentifierList* p, char* newName)
   }
   if (temp==NULL)
   {
-    return -1;
+    printf("ERROR: allocation 1 in addId\n");
+	return -1;
   }
   tempString = (char*)malloc(sizeof(char)*(1+strlen(newName)));
   if (tempString==NULL)
   {
-    return -1;
+    printf("ERROR: allocation 2 in addId\n");
+	return -1;
   }
   strcpy(tempString,newName);
   p->list[p->length].name = tempString;
@@ -178,11 +189,7 @@ static void clearIdList(struct IdentifierList* p)
 }
 
 /*------------------------------------------------------------------------------------------------------*/
-struct TokenList
-{
-  unsigned int length;
-  struct Token* list;
-};
+
 
 static int addToken(struct TokenList *pList, const struct Token* pToken)
 {
@@ -195,7 +202,8 @@ static int addToken(struct TokenList *pList, const struct Token* pToken)
     pList->list = (struct Token*)malloc(sizeof(struct Token));
     if (pList->list==NULL)
     {
-      return -1;
+      printf("ERROR: allocation in addToken\n");
+	  return -1;
     }
   }
   else
@@ -205,6 +213,7 @@ static int addToken(struct TokenList *pList, const struct Token* pToken)
     {
       free(pList->list);
       pList->list=NULL;
+	  printf("ERROR: allocation in addToken 2\n");
       return -1;
     }
   }
