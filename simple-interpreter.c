@@ -122,13 +122,14 @@ static int addId(struct IdentifierList* p, char* newName)
   if (temp==NULL)
   {
     printf("ERROR: allocation 1 in addId\n");
-	return -1;
+    return -1;
   }
+  p->list = temp;
   tempString = (char*)malloc(sizeof(char)*(1+strlen(newName)));
   if (tempString==NULL)
   {
     printf("ERROR: allocation 2 in addId\n");
-	return -1;
+    return -1;
   }
   strcpy(tempString,newName);
   p->list[p->length].name = tempString;
@@ -142,11 +143,13 @@ static int addId(struct IdentifierList* p, char* newName)
 static int findId(struct IdentifierList* p, char* newName)
 {
   int i;
+  if (p==NULL)
+    return -1;
+  if (p->list==NULL)
+    return -1;
   if (newName==NULL)
     return -1;
   if (strlen(newName)==0)
-    return -1;
-  if (p==NULL)
     return -1;
   for (i=0;i<p->length;++i)
   {
@@ -160,7 +163,7 @@ static int findId(struct IdentifierList* p, char* newName)
 static int putValue(struct IdentifierList* p, int id, struct NumberStruct *pNumber)
 {
   if (p==NULL)
-	return -1;
+    return -1;
   if (id>=p->length)
     return -1;
   if (id<0)
@@ -203,7 +206,7 @@ static int addToken(struct TokenList *pList, const struct Token* pToken)
     if (pList->list==NULL)
     {
       printf("ERROR: allocation in addToken\n");
-	  return -1;
+      return -1;
     }
   }
   else
@@ -213,11 +216,12 @@ static int addToken(struct TokenList *pList, const struct Token* pToken)
     {
       free(pList->list);
       pList->list=NULL;
-	  printf("ERROR: allocation in addToken 2\n");
+      printf("ERROR: allocation in addToken 2\n");
       return -1;
     }
+    pList->list = temp;
   }
-  memcpy(&pList->list[pList->length],pToken,sizeof(struct Token));
+  memcpy(&(pList->list[pList->length]),pToken,sizeof(struct Token));
   ++pList->length;
   return 0;
 }
@@ -228,11 +232,11 @@ static void clearTokenList(struct TokenList *pList)
   if (pList)
   {
     if (pList->list)
-	{
-	  free(pList->list);
-	}
+    {
+      free(pList->list);
+    }
     pList->list=NULL;
-	pList->length=0;
+    pList->length=0;
   }
 }
 
@@ -350,7 +354,6 @@ static void makeAssignment(struct Token *p)
 #define STATE_PUTTING_TOGETHER_NUMBER       2
 #define STATE_PROCESSING_SYMBOLS            3
 
-
 static int makeTokenList(char* input, struct TokenList* pTokenList, struct IdentifierList* pIdList)
 {
   int state;
@@ -362,6 +365,12 @@ static int makeTokenList(char* input, struct TokenList* pTokenList, struct Ident
   for (state=0,tokenIndex=0;;)
   {
     c = input[0];
+    
+    if (c)
+    {printf("Processing character %c in state %i\n",c,state);fflush(stdout);}
+    else
+    {printf("Reached the end of string in state %i\n",state);fflush(stdout);}
+    
     switch (state)
     {
       case STATE_AWAITING_FIRST_CHARACTER:
@@ -396,7 +405,16 @@ static int makeTokenList(char* input, struct TokenList* pTokenList, struct Ident
             if (c==0)
               return 0;
             else
-              state=STATE_PROCESSING_SYMBOLS;
+            {
+              if (c==' ')
+			  {
+			    ++input;
+			  }
+			  else
+			  {
+			    state=STATE_PROCESSING_SYMBOLS;
+			  }
+            }
           }
         }
       break;
@@ -411,17 +429,23 @@ static int makeTokenList(char* input, struct TokenList* pTokenList, struct Ident
         {
           if (makeIdentifierFromString(pIdList,&singleToken,tokenString))
           {
+            printf("ERROR: makeIdentifierFromString failed in state %i with token %s\n",state,tokenString);
+            fflush(stdout);
             return -1;
           }
           if (addToken(pTokenList,&singleToken))
           {
+            printf("ERROR: addToken failed in state %i\n",state);
+            fflush(stdout);
             return -1;
           }
           tokenIndex=0;
           if (c==0)
             return 0;
           else
-            state=STATE_AWAITING_FIRST_CHARACTER;
+          {
+			state=STATE_AWAITING_FIRST_CHARACTER;
+          }
         }
       break;
       case STATE_PUTTING_TOGETHER_NUMBER:
@@ -435,17 +459,23 @@ static int makeTokenList(char* input, struct TokenList* pTokenList, struct Ident
         {
           if (makeNumberFromString(pIdList,&singleToken,tokenString))
           {
+            printf("ERROR: makeNumberFromString failed in state %i with string %s\n",state,tokenString);
+            fflush(stdout);
             return -1;
           }
           if (addToken(pTokenList,&singleToken))
           {
+            printf("ERROR: addToken failed in state %i\n",state);
+            fflush(stdout);
             return -1;
           }
           tokenIndex=0;
           if (c==0)
             return 0;
           else
+          {
             state=STATE_AWAITING_FIRST_CHARACTER;
+          }
         }
       break;
       case STATE_PROCESSING_SYMBOLS:
@@ -483,6 +513,8 @@ static int makeTokenList(char* input, struct TokenList* pTokenList, struct Ident
         }
         if (addToken(pTokenList,&singleToken))
         {
+          printf("ERROR: addToken failed in state %i\n",state);
+          fflush(stdout);
           return -1;
         }
         ++input;
@@ -495,6 +527,63 @@ static int makeTokenList(char* input, struct TokenList* pTokenList, struct Ident
     }
   }
   return -1;
+}
+
+static void printToken(const struct Token* p, const struct IdentifierList* pIdList)
+{
+  if (p==NULL)
+    return;
+  if (pIdList==NULL)
+    return;
+  switch (p->type)
+  {
+    case TOKEN_NUMBER:
+      switch (p->uToken.sNumber.type)
+      {
+        case TOKEN_NUMBER_INTEGER:printf("%li",p->uToken.sNumber.uNumber.intValue);break;
+        case TOKEN_NUMBER_FLOAT:printf("%f",p->uToken.sNumber.uNumber.floatValue);break;
+        default:break;
+      }
+    break;
+    case TOKEN_IDENTIFIER:
+      printf("%s",pIdList->list[p->uToken.sIdentifier.id].name);
+    break;
+    case TOKEN_ASSIGNMENT:
+      printf("=");
+    break;
+    case TOKEN_OPERATOR:
+      switch (p->uToken.sOperator.opcode)
+      {
+        case TOKEN_OPERATOR_PLUS:printf("+");break;
+        case TOKEN_OPERATOR_MINUS:printf("-");break;
+        case TOKEN_OPERATOR_MULTIPLY:printf("*");break;
+        case TOKEN_OPERATOR_DIVIDE:printf("/");break;
+        case TOKEN_OPERATOR_REMAINDER:printf("%");break;
+        default:break;
+      }
+    break;
+    case TOKEN_BRACKET:
+      if (p->uToken.sBracket.open)
+        printf("(");
+      else
+        printf(")");
+    break;
+    default:break;
+  }
+}
+
+static void printTokenList(const struct TokenList* pTokenList, const struct IdentifierList* pIdList)
+{
+  int i;
+  if (pTokenList==NULL)
+    return;
+  if (pIdList==NULL)
+    return;
+  for (i=0;i<pTokenList->length;++i)
+  {
+    printToken(&(pTokenList->list[i]),pIdList);
+  }
+  printf("\n");
 }
 
 
@@ -656,5 +745,19 @@ Token executeList(std::deque<Token>& tList, bool openBracket)
 #endif
 int main(int argc, char* argv[])
 {
+  char input[] = "  x   =   ( 88.5 * 0 )  -  3    ";
+  struct TokenList tList = {0,NULL};
+  struct IdentifierList iList = {0,NULL};
+  
+  if (makeTokenList(input,&tList,&iList))
+  {
+    printf("ERROR: in makeTokenList\n");
+  }
+  else
+  {
+    printTokenList(&tList,&iList);
+  }
+  clearIdList(&iList);
+  clearTokenList(&tList);
   return 0;
 }
