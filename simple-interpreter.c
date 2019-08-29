@@ -241,6 +241,34 @@ static void clearTokenList(struct TokenList *pList)
 }
 
 /*------------------------------------------------------------------------------------------------------*/
+static int popFront(struct TokenList *pList, struct Token* pToken)
+{
+  struct Token* temp;
+  int i;
+  if (pList->list==NULL)
+    return -1;
+  if (pList->length==1)
+  {
+    memcpy(pToken,&(pList->list[0]),sizeof(struct Token));
+	clearTokenList(pList);
+	return 0;
+  }
+  temp = (struct Token*)malloc((pList->length-1)*sizeof(struct Token));
+  if (temp==NULL)
+  {
+    return -1;
+  }
+  for (i=1;i<pList->length;++i)
+  {
+    memcpy(&temp[i-1],&(pList->list[i]),sizeof(struct Token));
+  }
+  memcpy(pToken,&(pList->list[0]),sizeof(struct Token));
+  free(pList->list);
+  pList->list = temp;
+  return 0;
+}
+
+/*------------------------------------------------------------------------------------------------------*/
 static int isIdChar(char c)
 {
   if (isalpha(c))
@@ -362,7 +390,8 @@ static int makeTokenList(char* input, struct TokenList* pTokenList, struct Ident
   char tokenString[tokenStringLength];
   int tokenIndex;
   struct Token singleToken;
-  for (state=0,tokenIndex=0;;)
+  int minusIsUnary;
+  for (minusIsUnary=1,state=0,tokenIndex=0;;)
   {
     c = input[0];
     /*
@@ -407,13 +436,13 @@ static int makeTokenList(char* input, struct TokenList* pTokenList, struct Ident
             else
             {
               if (c==' ')
-			  {
-			    ++input;
-			  }
-			  else
-			  {
-			    state=STATE_PROCESSING_SYMBOLS;
-			  }
+              {
+                ++input;
+              }
+              else
+              {
+                state=STATE_PROCESSING_SYMBOLS;
+              }
             }
           }
         }
@@ -439,12 +468,13 @@ static int makeTokenList(char* input, struct TokenList* pTokenList, struct Ident
             fflush(stdout);
             return -1;
           }
+          minusIsUnary=0;
           tokenIndex=0;
           if (c==0)
             return 0;
           else
           {
-			state=STATE_AWAITING_FIRST_CHARACTER;
+            state=STATE_AWAITING_FIRST_CHARACTER;
           }
         }
       break;
@@ -469,6 +499,7 @@ static int makeTokenList(char* input, struct TokenList* pTokenList, struct Ident
             fflush(stdout);
             return -1;
           }
+          minusIsUnary=0;
           tokenIndex=0;
           if (c==0)
             return 0;
@@ -484,27 +515,43 @@ static int makeTokenList(char* input, struct TokenList* pTokenList, struct Ident
           case ' ':break;
           case '=':
             makeAssignment(&singleToken);
+            minusIsUnary=1;
           break;
           case '+':
             makeOperator(&singleToken,TOKEN_OPERATOR_PLUS);
+            minusIsUnary=0;
           break;
           case '-':
-            makeOperator(&singleToken,TOKEN_OPERATOR_MINUS);
+            if (minusIsUnary)
+            {
+              makeOperator(&singleToken,TOKEN_OPERATOR_NEGATE);
+              minusIsUnary=0;
+            }
+            else
+            {
+              makeOperator(&singleToken,TOKEN_OPERATOR_MINUS);
+              minusIsUnary=1;
+            }
           break;
           case '*':
             makeOperator(&singleToken,TOKEN_OPERATOR_MULTIPLY);
+            minusIsUnary=1;
           break;
           case '/':
             makeOperator(&singleToken,TOKEN_OPERATOR_DIVIDE);
+            minusIsUnary=1;
           break;
           case '%':
             makeOperator(&singleToken,TOKEN_OPERATOR_REMAINDER);
+            minusIsUnary=1;
           break;
           case '(':
             makeBracket(&singleToken,1);
+            minusIsUnary=1;
           break;
           case ')':
             makeBracket(&singleToken,0);
+            minusIsUnary=0;
           break;
           default:
             printf("ERROR: unhandled symbol %c\n",c);
@@ -559,7 +606,7 @@ static void printToken(const struct Token* p, const struct IdentifierList* pIdLi
         case TOKEN_OPERATOR_MULTIPLY:printf("*");break;
         case TOKEN_OPERATOR_DIVIDE:printf("/");break;
         case TOKEN_OPERATOR_REMAINDER:printf("%");break;
-		case TOKEN_OPERATOR_NEGATE:printf("~");break;
+        case TOKEN_OPERATOR_NEGATE:printf("~");break;
         default:break;
       }
     break;
@@ -664,64 +711,77 @@ static int numberOperation(const struct NumberStruct* first, const struct Number
   switch (opcode)
   {
     case TOKEN_OPERATOR_PLUS:
-	  if ((first->type == TOKEN_NUMBER_INTEGER) && (second->type == TOKEN_NUMBER_INTEGER))
-	  {
-	    result->type = TOKEN_NUMBER_INTEGER;
-		result->uNumber.intValue = first->uNumber.intValue + second->uNumber.intValue;
-		return 0;
-	  }
-	break;
+      if ((first->type == TOKEN_NUMBER_INTEGER) && (second->type == TOKEN_NUMBER_INTEGER))
+      {
+        result->type = TOKEN_NUMBER_INTEGER;
+        result->uNumber.intValue = first->uNumber.intValue + second->uNumber.intValue;
+        return 0;
+      }
+    break;
     case TOKEN_OPERATOR_MINUS:
-	  if ((first->type == TOKEN_NUMBER_INTEGER) && (second->type == TOKEN_NUMBER_INTEGER))
-	  {
-	    result->type = TOKEN_NUMBER_INTEGER;
-		result->uNumber.intValue = first->uNumber.intValue - second->uNumber.intValue;
-		return 0;
-	  }
-	break;
+      if ((first->type == TOKEN_NUMBER_INTEGER) && (second->type == TOKEN_NUMBER_INTEGER))
+      {
+        result->type = TOKEN_NUMBER_INTEGER;
+        result->uNumber.intValue = first->uNumber.intValue - second->uNumber.intValue;
+        return 0;
+      }
+    break;
     case TOKEN_OPERATOR_MULTIPLY:
-	  if ((first->type == TOKEN_NUMBER_INTEGER) && (second->type == TOKEN_NUMBER_INTEGER))
-	  {
-	    result->type = TOKEN_NUMBER_INTEGER;
-		result->uNumber.intValue = first->uNumber.intValue * second->uNumber.intValue;
-		return 0;
-	  }
-	break;
+      if ((first->type == TOKEN_NUMBER_INTEGER) && (second->type == TOKEN_NUMBER_INTEGER))
+      {
+        result->type = TOKEN_NUMBER_INTEGER;
+        result->uNumber.intValue = first->uNumber.intValue * second->uNumber.intValue;
+        return 0;
+      }
+    break;
     case TOKEN_OPERATOR_DIVIDE:
-	  if ((first->type == TOKEN_NUMBER_INTEGER) && (second->type == TOKEN_NUMBER_INTEGER))
-	  {
-	    if (second->uNumber.intValue==0)
-		{
-		  printf("ERROR: division by zero\n");
-		  return -1;
-		}
-		tempValue = first->uNumber.intValue / second->uNumber.intValue;
-		tempRemainder = first->uNumber.intValue % second->uNumber.intValue;
-		if (tempRemainder)
-		{
-		  result->type = TOKEN_NUMBER_FLOAT;
-		  result->uNumber.floatValue = (double)first->uNumber.intValue / (double)second->uNumber.intValue;
-		  return 0;
-		}
-		else
-		{
-		  result->type = TOKEN_NUMBER_INTEGER;
-		  result->uNumber.intValue = first->uNumber.intValue / second->uNumber.intValue;
-		  return 0;
-		}
-	  }
-	break;
+      if ((first->type == TOKEN_NUMBER_INTEGER) && (second->type == TOKEN_NUMBER_INTEGER))
+      {
+        if (second->uNumber.intValue==0)
+        {
+          printf("ERROR: division by zero\n");
+          return -1;
+        }
+        tempValue = first->uNumber.intValue / second->uNumber.intValue;
+        tempRemainder = first->uNumber.intValue % second->uNumber.intValue;
+        if (tempRemainder)
+        {
+          result->type = TOKEN_NUMBER_FLOAT;
+          result->uNumber.floatValue = (double)first->uNumber.intValue / (double)second->uNumber.intValue;
+          return 0;
+        }
+        else
+        {
+          result->type = TOKEN_NUMBER_INTEGER;
+          result->uNumber.intValue = first->uNumber.intValue / second->uNumber.intValue;
+          return 0;
+        }
+      }
+    break;
     case TOKEN_OPERATOR_REMAINDER:
-	  if ((first->type == TOKEN_NUMBER_INTEGER) && (second->type == TOKEN_NUMBER_INTEGER))
-	  {
-	    result->type = TOKEN_NUMBER_INTEGER;
-		result->uNumber.intValue = first->uNumber.intValue % second->uNumber.intValue;
-		return 0;
-	  }
-	break;
-	default:
-	  return -1;
-	break;
+      if ((first->type == TOKEN_NUMBER_INTEGER) && (second->type == TOKEN_NUMBER_INTEGER))
+      {
+        result->type = TOKEN_NUMBER_INTEGER;
+        result->uNumber.intValue = first->uNumber.intValue % second->uNumber.intValue;
+        return 0;
+      }
+    break;
+    case TOKEN_OPERATOR_NEGATE:
+      if (second!=NULL)
+      {
+        printf("ERROR: unexpected second argument for negate\n");
+        return -1;
+      }
+      if (first->type == TOKEN_NUMBER_INTEGER)
+      {
+        result->type = TOKEN_NUMBER_INTEGER;
+        result->uNumber.intValue = -first->uNumber.intValue;
+        return 0;
+      }
+    break;
+    default:
+      return -1;
+    break;
   }
   return -1;
 }
@@ -732,313 +792,274 @@ static int executeOperation(const struct Token* first, const struct Token* secon
   if (operation->type == TOKEN_ASSIGNMENT)
   {
     if (first->type == TOKEN_IDENTIFIER)
-	{
-	  if (second->type == TOKEN_IDENTIFIER)
-	  {
-	    if (pIdList->list[second->uToken.sIdentifier.id].numberIsValid)
-		{
-		  pIdList->list[first->uToken.sIdentifier.id].sNumber = pIdList->list[second->uToken.sIdentifier.id].sNumber;
-		  pIdList->list[first->uToken.sIdentifier.id].numberIsValid=1;
-		  return 0;
-		}
-		else
-		{
-		  printf("ERROR: unknown value for assignment\n");
-          return -1;
-		}
-	  }
-	  else
-	  {
-	    if (second->type == TOKEN_NUMBER)
-		{
-		  pIdList->list[first->uToken.sIdentifier.id].sNumber = second->uToken.sNumber;
-		  pIdList->list[first->uToken.sIdentifier.id].numberIsValid=1;
-		  return 0;
-		}
-		else
-		{
-	      printf("ERROR: expected identifier or number\n");
-          return -1;
-		}
-	  }
-	}
-	else
-	{
-	  printf("ERROR: identifier required for assignment\n");
-	  return -1;
-	}
-  }
-  else
-  {
-	if (operation->type == TOKEN_OPERATOR)
-	{
-	  if (first->type == TOKEN_IDENTIFIER)
-	  {
-	    if (pIdList->list[first->uToken.sIdentifier.id].numberIsValid)
-		{
-		  temp1 = pIdList->list[first->uToken.sIdentifier.id].sNumber;
-		}
-		else
-		{
-		  printf("ERROR: identifier has no value assigned yet\n");
-		  return -1;
-		}
-	  }
-	  else
-	  {
-	    if (first->type == TOKEN_NUMBER)
-		{
-		  temp1 = first->uToken.sNumber;
-		}
-		else
-		{
-		  printf("ERROR: identifier or value needed\n");
-		  return -1;
-		}
-	  }
-	  if (second->type == TOKEN_IDENTIFIER)
-	  {
-	    if (pIdList->list[second->uToken.sIdentifier.id].numberIsValid)
-		{
-		  temp2 = pIdList->list[second->uToken.sIdentifier.id].sNumber;
-		}
-		else
-		{
-		  printf("ERROR: identifier has no value assigned yet\n");
-		  return -1;
-		}
-	  }
-	  else
-	  {
-	    if (second->type == TOKEN_NUMBER)
-		{
-		  temp2 = second->uToken.sNumber;
-		}
-		else
-		{
-		  printf("ERROR: identifier or value needed\n");
-		  return -1;
-		}
-	  }
-	  result->type = TOKEN_NUMBER;
-	  if (numberOperation(&temp1,&temp2,operation->uToken.sOperator.opcode,&(result->uToken.sNumber)))
-	  {
-	    printf("ERROR: in numberOperation");
-		return -1;
-	  }
-	}
-	else
-	{
-	  printf("ERROR: expected operation or assignment\n");
-      return -1;	
-	}	
-  }
-}
-
-
-#if 0
-static Token executeOperation(const Token& first, const Token& second, const Token& operation, )
-{
-  Token result;
-  if (operation.type != Token::eOperator)
-  {
-    result.type = Token::eInvalid;
-    return result;
-  }
-  if (first.type == Token::eIntNumber)
-  {
-    if (second.type == Token::eIntNumber)
     {
-      result.type = Token::eIntNumber;
-      switch (operation.data.op.opcode)
+      if (second->type == TOKEN_IDENTIFIER)
       {
-        case 0: result.data.intValue = first.data.intValue + second.data.intValue; return result;
-        case 1: result.data.intValue = first.data.intValue - second.data.intValue; return result;
-        case 2: result.data.intValue = first.data.intValue * second.data.intValue; return result;
-        case 3: result.data.intValue = first.data.intValue / second.data.intValue; return result;
-        default:result.type = Token::eInvalid;return result;
+        if (pIdList->list[second->uToken.sIdentifier.id].numberIsValid)
+        {
+          pIdList->list[first->uToken.sIdentifier.id].sNumber = pIdList->list[second->uToken.sIdentifier.id].sNumber;
+          pIdList->list[first->uToken.sIdentifier.id].numberIsValid=1;
+          return 0;
+        }
+        else
+        {
+          printf("ERROR: unknown value for assignment\n");
+          return -1;
+        }
+      }
+      else
+      {
+        if (second->type == TOKEN_NUMBER)
+        {
+          pIdList->list[first->uToken.sIdentifier.id].sNumber = second->uToken.sNumber;
+          pIdList->list[first->uToken.sIdentifier.id].numberIsValid=1;
+          return 0;
+        }
+        else
+        {
+          printf("ERROR: expected identifier or number\n");
+          return -1;
+        }
       }
     }
     else
     {
-      if (second.type == Token::eFlNumber)
-      {
-        result.type = Token::eFlNumber;
-        switch (operation.data.op.opcode)
-        {
-          case 0: result.data.flValue = (double)first.data.intValue + second.data.flValue; return result;
-          case 1: result.data.flValue = (double)first.data.intValue - second.data.flValue; return result;
-          case 2: result.data.flValue = (double)first.data.intValue * second.data.flValue; return result;
-          case 3: result.data.flValue = (double)first.data.intValue / second.data.flValue; return result;
-          default:result.type = Token::eInvalid;return result;
-        }
-      }
-      else
-      {
-        result.type = Token::eInvalid;
-        return result;
-      }
+      printf("ERROR: identifier required for assignment\n");
+      return -1;
     }
   }
   else
   {
-    if (first.type == Token::eFlNumber)
+    if (operation->type == TOKEN_OPERATOR)
     {
-      if (second.type == Token::eIntNumber)
+      if (first->type == TOKEN_IDENTIFIER)
       {
-        result.type = Token::eFlNumber;
-        switch (operation.data.op.opcode)
+        if (pIdList->list[first->uToken.sIdentifier.id].numberIsValid)
         {
-          case 0: result.data.flValue = first.data.flValue + (double)second.data.intValue; return result;
-          case 1: result.data.flValue = first.data.flValue - (double)second.data.intValue; return result;
-          case 2: result.data.flValue = first.data.flValue * (double)second.data.intValue; return result;
-          case 3: result.data.flValue = first.data.flValue / (double)second.data.intValue; return result;
-          default:result.type = Token::eInvalid;return result;
+          temp1 = pIdList->list[first->uToken.sIdentifier.id].sNumber;
+        }
+        else
+        {
+          printf("ERROR: identifier has no value assigned yet\n");
+          return -1;
         }
       }
       else
       {
-        if (second.type == Token::eFlNumber)
+        if (first->type == TOKEN_NUMBER)
         {
-          result.type = Token::eFlNumber;
-          switch (operation.data.op.opcode)
+          temp1 = first->uToken.sNumber;
+        }
+        else
+        {
+          printf("ERROR: identifier or value needed\n");
+          return -1;
+        }
+      }
+      if (second!=NULL)
+	  {
+        if (second->type == TOKEN_IDENTIFIER)
+        {
+          if (pIdList->list[second->uToken.sIdentifier.id].numberIsValid)
           {
-            case 0: result.data.flValue = first.data.flValue + second.data.flValue; return result;
-            case 1: result.data.flValue = first.data.flValue - second.data.flValue; return result;
-            case 2: result.data.flValue = first.data.flValue * second.data.flValue; return result;
-            case 3: result.data.flValue = first.data.flValue / second.data.flValue; return result;
-            default:result.type = Token::eInvalid;return result;
+            temp2 = pIdList->list[second->uToken.sIdentifier.id].sNumber;
+          }
+          else
+          {
+            printf("ERROR: identifier has no value assigned yet\n");
+            return -1;
           }
         }
         else
         {
-          result.type = Token::eInvalid;
-          return result;
+          if (second->type == TOKEN_NUMBER)
+          {
+            temp2 = second->uToken.sNumber;
+          }
+          else
+          {
+            printf("ERROR: identifier or value needed\n");
+            return -1;
+          }
         }
-      }
+        result->type = TOKEN_NUMBER;
+        if (numberOperation(&temp1,&temp2,operation->uToken.sOperator.opcode,&(result->uToken.sNumber)))
+        {
+          printf("ERROR: in numberOperation");
+          return -1;
+        }
+	  }
+	  else
+	  {
+	    if (operation->uToken.sOperator.opcode==TOKEN_OPERATOR_NEGATE)
+		{
+		  result->type = TOKEN_NUMBER;
+		  if (numberOperation(&temp1,NULL,TOKEN_OPERATOR_NEGATE,&(result->uToken.sNumber)))
+		  {
+		    printf("ERROR: negate failed\n");
+			return -1;
+		  }
+		}
+		else
+		{
+		  printf("ERROR: only negate requires one argument\n");
+		  return -1;
+		}
+	  }
     }
     else
     {
-      result.type = Token::eInvalid;
-      return result;
-    }
+      printf("ERROR: expected operation or assignment\n");
+      return -1;    
+    }   
   }
+  return 0;
 }
 
-Token flushDeque(std::deque<Token>& tList)
+
+
+
+static int flushStack(struct TokenStack* pStack, struct Token* result, struct IdentifierList* pIdList)
 {
-  Token next, operation, temp, first, second;
-  for (;tList.size()>0;)
+  struct Token *operation, *temp, *first, *second;
+  for (;pStack->length>0;)
   {
-    temp = tList.back();
-    tList.pop_back();
-    std::cout<<"Output item: "<<temp<<std::endl<<std::flush;
-    if (temp.type == Token::eOperator)
+    pop(pStack,temp);
+    if (temp->type == TOKEN_OPERATOR)
     {
-      if (tList.size()<2)
-      {
-        std::cout<<"Output stack underflow"<<std::endl<<std::flush;
-        temp.type == Token::eInvalid;
-        return temp;
-      }
-      second = tList.back();
-      tList.pop_back();
-      first = tList.back();
-      tList.pop_back();
-      operation = temp;
-      std::cout<<"Preparing: "<<first<<", "<<second<<", "<<operation<<std::endl<<std::flush;
-      temp = executeOperation(first, second, operation);
-      tList.push_back(temp);
+      if (temp->uToken.sOperator.opcode == TOKEN_OPERATOR_NEGATE)
+	  {
+	    if (pStack->length<1)
+        {
+	      printf("ERROR: underflow\n");
+		  return -1;
+        }
+	    pop(pStack,first);
+        operation = temp;
+        if (executeOperation(first, NULL, operation, result, pIdList))
+	    {
+	      printf("ERROR: executeOperation in flush\n");
+		  return -1;
+	    }
+        push(pStack,result);
+	  }
+	  else
+	  {
+	    if (pStack->length<2)
+        {
+	      printf("ERROR: underflow\n");
+		  return -1;
+        }
+	    pop(pStack,second);
+	    pop(pStack,first);
+        operation = temp;
+        if (executeOperation(first, second, operation,result, pIdList))
+	    {
+	      printf("ERROR: executeOperation in flush\n");
+		  return -1;
+	    }
+        push(pStack,result);
+	  }
     }
     else
     {
-      if (tList.size()>0)
-      {
-        std::cout<<"ERROR44"<<std::endl;
-        temp.type == Token::eInvalid;
-        return temp;
-      }
-      return temp;
+      if (temp->type == TOKEN_ASSIGNMENT)
+	  {
+	    if (pStack->length<2)
+        {
+	      printf("ERROR: underflow\n");
+		  return -1;
+        }
+	    pop(pStack,second);
+	    pop(pStack,first);
+        operation = temp;
+        if (executeOperation(first, second, operation,result, pIdList))
+	    {
+	      printf("ERROR: executeOperation in flush\n");
+		  return -1;
+	    }
+        push(pStack,result);
+	  }
     }
   }
-  return temp;
+  return 0;
 }
 
-Token executeList(std::deque<Token>& tList, bool openBracket)
+
+static int executeList(struct TokenList* pList, struct Token* result, struct IdentifierList* pIdList, int openBracket)
 {
-  Token next, operation, temp;
-  std::deque<Token> output, opStack;
-  bool keepLooping;
-  for (keepLooping=true;(tList.size()>0) && keepLooping;)
+  struct Token next, operation, temp;
+  struct TokenStack output = {0,NULL,NULL};
+  struct TokenStack opStack = {0,NULL,NULL};
+  int keepLooping;
+  for (keepLooping=1;(pList->length>0) && keepLooping;)
   {
-    next = tList.front();
-    tList.pop_front();
-    std::cout<<"Processing token "<<next<<std::endl<<std::flush;
+    if (popFront(pList,&next))
+	{
+	  return -1;
+	}
     switch (next.type)
     {
-      case Token::eInvalid:
-        return next;
+      case TOKEN_NUMBER:
+		push(&output,&next);
       break;
-      case Token::eIntNumber:
-      case Token::eFlNumber:
-        output.push_back(next);
-      break;
-      case Token::eBracket:
-        if (next.data.brkt.open)
+      case TOKEN_BRACKET:
+        if (next.uToken.sBracket.open)
         {
-          temp = executeList(tList,true);
-          output.push_back(temp);
+          if (executeList(pList,&temp,pIdList,1))
+		  {
+		    return -1;
+		  }
+          push(&output,&temp);
         }
         else
         {
           if (openBracket)
           {
-            for (;opStack.size()>0;)
+            for (;opStack.length>0;)
             {
-              temp = opStack.back();
-              opStack.pop_back();
-              output.push_back(temp);
-              keepLooping = false;
+              pop(&opStack,&temp);
+              push(&output,&temp);
+              keepLooping = 0;
             }
           }
           else
           {
-            temp.type = Token::eInvalid;
-            return temp;
+		    return -1;
           }
         }
       break;
-      case Token::eOperator:
-        if (opStack.size()>0)
+      case TOKEN_OPERATOR:
+        if (opStack.length>0)
         {
-          temp = opStack.back();
-          if (higherPrecedence(temp,next))
+		  memcpy(&temp,opStack.back,sizeof(struct Token));
+          if (higherPrecedence(&temp,&next))
           {
-            opStack.pop_back();
-            output.push_back(temp);
+            pop(&opStack,NULL);
+            push(&output,&temp);
           }
         }
-        opStack.push_back(next);
+        push(&opStack,&next);
       break;
       default:
-        std::cout<<"ERROR"<<std::endl<<std::flush;
-        temp.type = Token::eInvalid;
-        return temp;
+        return -1;
     }
   }
-  std::cout<<"Processing output stack"<<std::endl<<std::flush;
-  for (;opStack.size()>0;)
+  for (;opStack.length>0;)
   {
-    temp = opStack.back();
-    opStack.pop_back();
-    output.push_back(temp);
+	pop(&opStack,&temp);
+    push(&output,&temp);
   }
-  return flushDeque(output);
+  if (flushStack(&opStack,result,pIdList))
+  {
+    return -1;
+  }
+  return 0;
 }
-#endif
+
 int main(int argc, char* argv[])
 {
-  char input[] = "  x   =   ( 88.5 * 0 )  -  3    ";
+  char input[] = "  x   =   -(x/  88 + 10 )  -  3    ";
   struct TokenList tList = {0,NULL};
   struct IdentifierList iList = {0,NULL};
   
