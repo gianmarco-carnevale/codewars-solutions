@@ -1213,6 +1213,21 @@ static int buildReverseStack(struct TokenList* pList, struct TokenStack* pOutSta
         }
       break;
       case TOKEN_ASSIGNMENT:
+        for (;operatorStack.length>0;)
+        {
+		  memcpy(&temp,operatorStack.back,sizeof(struct Token));
+		  if (temp.type==TOKEN_ASSIGNMENT)
+		  {
+		    break;
+		  }
+		  else
+		  {
+		    popBack(&operatorStack,&temp);
+		    pushBack(pOutStack,&temp);
+		  }
+        }
+        pushBack(&operatorStack,&next);
+	  break;
       case TOKEN_OPERATOR:
         for (keepLooping=1;(operatorStack.length>0)&&keepLooping;)
         {
@@ -1341,6 +1356,7 @@ void doTest(char* input)
 
 int main(int argc, char* argv[])
 {
-  doTest("10 - 8/2) * 4");
+  doTest("x=y=4");
+  doTest("z=w=x+y");
   return 0;
 }
