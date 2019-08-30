@@ -163,7 +163,7 @@ static int addId(struct IdentifierList* p, char* newName)
   p->list[p->length].numberIsValid = 0;
   memset(&(p->list[p->length].sNumber),0,sizeof(struct NumberStruct));
   p->length += 1;
-  return 0;
+  return p->length-1;
 }
 
 /*-----------------------------------------------------------*/
@@ -177,7 +177,6 @@ static int findId(struct IdentifierList* p, char* newName)
   }
   if (p->list==NULL)
   {
-    printf("ERROR: null identifier list\n");
     return -1;
   }
   if (newName==NULL)
@@ -451,12 +450,6 @@ static int makeTokenList(char* input, struct TokenList* pTokenList, struct Ident
   for (minusIsUnary=1,state=0,tokenIndex=0;;)
   {
     c = input[0];
-    /*
-    if (c)
-    {printf("Processing character %c in state %i\n",c,state);fflush(stdout);}
-    else
-    {printf("Reached the end of string in state %i\n",state);fflush(stdout);}
-    */
     switch (state)
     {
       case STATE_AWAITING_FIRST_CHARACTER:
@@ -786,6 +779,23 @@ static int popFront(struct TokenStack* pStack, struct Token* pToken)
 }
 
 /*---------------------------------------------------------------------------------------------*/
+static void clearStack(struct TokenStack* pStack)
+{
+  struct TokenBlock *temp1, *temp2;
+  if (pStack==NULL)
+    return;
+  for (temp1=pStack->front;temp1;)
+  {
+    temp2 = temp1->next;
+    free(temp1);
+    temp1 = temp2;
+  }
+  pStack->front=NULL;
+  pStack->back=NULL;
+  pStack->length=0;
+}
+
+/*---------------------------------------------------------------------------------------------*/
 static void printStack(const struct TokenStack* pStack, const struct IdentifierList* pIdList)
 {
   struct TokenBlock *temp;
@@ -813,11 +823,11 @@ static int getPriority(const struct Token* p)
     switch (p->uToken.sOperator.opcode)
     {
       case TOKEN_OPERATOR_NEGATE: return 5;
-      case TOKEN_OPERATOR_MULTIPLY: return 4;
+      case TOKEN_OPERATOR_MULTIPLY: return 3;
       case TOKEN_OPERATOR_DIVIDE: return 3;
       case TOKEN_OPERATOR_PLUS: return 2;
       case TOKEN_OPERATOR_MINUS: return 2;
-      case TOKEN_OPERATOR_REMAINDER: return 1;
+      case TOKEN_OPERATOR_REMAINDER: return 4;
       default: return -1;
     }
   }
@@ -915,10 +925,9 @@ static int numberOperation(const struct NumberStruct* first, const struct Number
 }
 
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-static int executeOperation(const struct Token* first, const struct Token* second, const struct Token* operation, struct Token* result, const struct IdentifierList* pIdList)
+static int executeOperation(const struct Token* first, const struct Token* second, const struct Token* operation, struct Token* result, struct IdentifierList* pIdList)
 {
   struct NumberStruct temp1, temp2;
-  printf("executeOperation: ");printToken(first,pIdList);printf(", ");printToken(second,pIdList);printf(", ");printToken(operation,pIdList);printf("\n");
   if (operation->type == TOKEN_ASSIGNMENT)
   {
     if (first->type == TOKEN_IDENTIFIER)
@@ -927,10 +936,9 @@ static int executeOperation(const struct Token* first, const struct Token* secon
       {
         if (pIdList->list[second->uToken.sIdentifier.id].numberIsValid)
         {
-          pIdList->list[first->uToken.sIdentifier.id].sNumber = pIdList->list[second->uToken.sIdentifier.id].sNumber;
-          pIdList->list[first->uToken.sIdentifier.id].numberIsValid=1;
           result->type = TOKEN_NUMBER;
-          result->uToken.sNumber = pIdList->list[first->uToken.sIdentifier.id].sNumber;
+          result->uToken.sNumber = pIdList->list[second->uToken.sIdentifier.id].sNumber;
+          putValue(pIdList,first->uToken.sIdentifier.id,&result->uToken.sNumber);
           return 0;
         }
         else
@@ -943,10 +951,9 @@ static int executeOperation(const struct Token* first, const struct Token* secon
       {
         if (second->type == TOKEN_NUMBER)
         {
-          pIdList->list[first->uToken.sIdentifier.id].sNumber = second->uToken.sNumber;
-          pIdList->list[first->uToken.sIdentifier.id].numberIsValid=1;
           result->type = TOKEN_NUMBER;
-          result->uToken.sNumber = pIdList->list[first->uToken.sIdentifier.id].sNumber;
+          result->uToken.sNumber = second->uToken.sNumber;
+          putValue(pIdList,first->uToken.sIdentifier.id,&result->uToken.sNumber);
           return 0;
         }
         else
@@ -974,7 +981,7 @@ static int executeOperation(const struct Token* first, const struct Token* secon
         }
         else
         {
-          printf("ERROR: identifier has no value assigned yet\n");
+          printf("ERROR: identifier has no value assigned yet (1)\n");
           return -1;
         }
       }
@@ -1000,7 +1007,7 @@ static int executeOperation(const struct Token* first, const struct Token* secon
           }
           else
           {
-            printf("ERROR: identifier has no value assigned yet\n");
+            printf("ERROR: identifier has no value assigned yet (2)\n");
             return -1;
           }
         }
@@ -1121,11 +1128,31 @@ static int executeStack(struct TokenStack* pStack, struct Token* result, struct 
       break;
     }
   }
-  *result = temp;
-  printf("flushStack returns ");
-  printToken(result,pIdList);
-  printf("\n");
-  return 0;
+  if (localStack.length!=1)
+  {
+    printf("ERROR: stack flow\n");
+    return -1;
+  }
+  popBack(&localStack,&temp);
+  clearStack(&localStack);
+  switch (temp.type)
+  {
+    case TOKEN_NUMBER:
+      *result = temp;
+      return 0;
+    break;
+    case TOKEN_IDENTIFIER:
+      if (pIdList->list[temp.uToken.sIdentifier.id].numberIsValid)
+      {
+        result->type = TOKEN_NUMBER;
+        result->uToken.sNumber = pIdList->list[temp.uToken.sIdentifier.id].sNumber;
+        return 0;
+      }   
+    break;
+    default:
+    break;
+  }
+  return -1;
 }
 
 /*---------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -1199,61 +1226,99 @@ static int buildReverseStack(struct TokenList* pList, struct TokenStack* pOutSta
     popBack(&operatorStack,&temp);
     pushBack(pOutStack,&temp);
   }
+  clearStack(&operatorStack);
   return 0;
 }
 
-static int evaluate(char* input, struct Token* result)
+typedef int Type;
+
+/* Status codes */
+enum StatusCodes {
+    OK_CODE = 0,          /* Success */
+    EMPTY_CODE = 1,       /* Input string consists entirely of whitespaces */
+    /* 2, 3, ... */       /* Errors */
+};
+
+struct IdentifierList iList={0,NULL};
+static int getTokenResult(char* input, struct Token* result)
 {
   struct TokenList tList = {0,NULL};
-  static struct IdentifierList iList = {0,NULL};
   struct TokenStack outputStack = {0,NULL,NULL};
-  if ((input==NULL)&&(result==NULL))
-  {
-    clearIdList(&iList);
-    return 0;
-  }
   if (makeTokenList(input,&tList,&iList))
   {
     printf("ERROR: in makeTokenList\n");
     clearTokenList(&tList);
     return -1;
   }
-  printTokenList(&tList,&iList);
+  if (tList.length==0)
+  {
+    return EMPTY_CODE;
+  }
   if (buildReverseStack(&tList, &outputStack, &iList))
   {
-    clearTokenList(&tList);
-    return -1;
-  }
-  printf("output");
-  printStack(&outputStack,&iList);
-  if (executeStack(&outputStack,result,&iList))
-  {
+    clearStack(&outputStack);
     clearTokenList(&tList);
     return -1;
   }
   clearTokenList(&tList);
-  return 0;
+  if (executeStack(&outputStack,result,&iList))
+  {
+    clearStack(&outputStack);
+    return -1;
+  }
+  clearStack(&outputStack);
+  return OK_CODE;
 }
+
+
+
+/* initInterpreter: initialize the interpreter if necessary and return
+   a status code (any value other than OK_CODE is treated as an error) */
+int initInterpreter(void)
+{
+    iList.length=0;
+    iList.list=NULL;
+    return OK_CODE;
+}
+
+/* closeInterpreter: close the interpreter and free memory if necessary */
+void closeInterpreter(void)
+{
+    clearIdList(&iList);
+    return;
+}
+
+/* evaluate: evaluate the string expression, and return a status code
+   (any value other than OK_CODE and EMPTY_CODE is treated as an error).
+   The result of evaluating the expression is placed in a variable
+   by the pointer 'result' if the function returns OK_CODE. */
+int evaluate(char *input, Type *result)
+{
+    int retValue;
+    struct Token finalValue;
+    retValue = getTokenResult(input,&finalValue);
+    if (retValue == OK_CODE)
+    {
+      if (finalValue.type==TOKEN_NUMBER)
+      {
+        if (finalValue.uToken.sNumber.type==TOKEN_NUMBER_INTEGER)
+        {
+          *result = finalValue.uToken.sNumber.uNumber.intValue;
+          return OK_CODE;
+        }
+        return -1;
+      }
+      return -1;
+    }
+    return retValue;
+}
+
 
 int main(int argc, char* argv[])
 {
-  char input[] = "x=7+8*(4+5*3)";
   struct Token r;
-  if (evaluate(input,&r)==0)
-  {
-    printf("%li\n",r.uToken.sNumber.uNumber.intValue);
-  }
-  else
-  {
-    printf("ERROR: evaluate\n");
-  }
-  if (evaluate("x=x+1",&r)==0)
-  {
-    printf("%li\n",r.uToken.sNumber.uNumber.intValue);
-  }
-  else
-  {
-    printf("ERROR: evaluate\n");
-  }
+  getTokenResult("25 + 4 * 7 - 17*1/1 + 20  / 10 * 5 -7",&r);
+  printToken(&r,&iList);printf("\n");
+
   return 0;
 }
