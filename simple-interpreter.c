@@ -899,6 +899,11 @@ static int numberOperation(const struct NumberStruct* first, const struct Number
     case TOKEN_OPERATOR_REMAINDER:
       if ((first->type == TOKEN_NUMBER_INTEGER) && (second->type == TOKEN_NUMBER_INTEGER))
       {
+        if (second->uNumber.intValue==0)
+        {
+          printf("ERROR: remainder after division by zero\n");
+          return -1;
+        }
         result->type = TOKEN_NUMBER_INTEGER;
         result->uNumber.intValue = first->uNumber.intValue % second->uNumber.intValue;
         return 0;
@@ -1205,7 +1210,7 @@ static int buildReverseStack(struct TokenList* pList, struct TokenStack* pOutSta
       break;
       case TOKEN_ASSIGNMENT:
       case TOKEN_OPERATOR:
-        if (operatorStack.length>0)
+        for (keepLooping=1;(operatorStack.length>0)&&keepLooping;)
         {
           memcpy(&temp,operatorStack.back,sizeof(struct Token));
           if (higherPrecedence(&temp,&next))
@@ -1213,6 +1218,10 @@ static int buildReverseStack(struct TokenList* pList, struct TokenStack* pOutSta
             popBack(&operatorStack,NULL);
             pushBack(pOutStack,&temp);
           }
+		  else
+		  {
+		    keepLooping=0;
+		  }
         }
         pushBack(&operatorStack,&next);
       break;
@@ -1250,6 +1259,8 @@ static int getTokenResult(char* input, struct Token* result)
     clearTokenList(&tList);
     return -1;
   }
+  printf("Tokenlist: ");
+  printTokenList(&tList,&iList);
   if (tList.length==0)
   {
     return EMPTY_CODE;
@@ -1260,6 +1271,8 @@ static int getTokenResult(char* input, struct Token* result)
     clearTokenList(&tList);
     return -1;
   }
+  printf("Outputstack:");
+  printStack(&outputStack, &iList);
   clearTokenList(&tList);
   if (executeStack(&outputStack,result,&iList))
   {
@@ -1317,6 +1330,7 @@ int evaluate(char *input, Type *result)
 void doTest(char* input)
 {
   struct Token r;
+  printf("Input: %s\n",input);
   getTokenResult(input,&r);
   printToken(&r,&iList);printf("\n");
 }
