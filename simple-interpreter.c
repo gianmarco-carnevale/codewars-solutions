@@ -453,7 +453,7 @@ static int makeTokenList(char* input, struct TokenList* pTokenList, struct Ident
     switch (state)
     {
       case STATE_AWAITING_FIRST_CHARACTER:
-        if (isalpha(c))
+        if (isIdChar(c))
         {
           if (tokenIndex>=tokenStringLength)
           {
@@ -498,7 +498,7 @@ static int makeTokenList(char* input, struct TokenList* pTokenList, struct Ident
         }
       break;
       case STATE_PUTTING_TOGETHER_IDENTIFIER:
-        if (isIdChar(c))
+        if (isIdChar(c)||isdigit(c))
         {
           tokenString[tokenIndex++]=c;
           tokenString[tokenIndex]=0;
@@ -668,7 +668,7 @@ static void printToken(const struct Token* p, const struct IdentifierList* pIdLi
         printf(")");
     break;
     default:
-      printf("@@@");
+      printf("<ERROR: unhandled token type>");
     break;
   }
 }
@@ -1031,7 +1031,7 @@ static int executeOperation(const struct Token* first, const struct Token* secon
         result->type = TOKEN_NUMBER;
         if (numberOperation(&temp1,&temp2,operation->uToken.sOperator.opcode,&(result->uToken.sNumber)))
         {
-          printf("ERROR: in numberOperation");
+          printf("ERROR: in numberOperation\n");
           return -1;
         }
       }
@@ -1165,6 +1165,7 @@ static int buildReverseStack(struct TokenList* pList, struct TokenStack* pOutSta
 {
   struct Token next, operation, temp;
   int keepLooping;
+  int foundOpenBracket;
   struct TokenStack operatorStack = {0,NULL,NULL};
   for (;pList->length>0;)
   {
@@ -1186,26 +1187,29 @@ static int buildReverseStack(struct TokenList* pList, struct TokenStack* pOutSta
         }
         else
         {
-          for (keepLooping=1;keepLooping;)
+          for (keepLooping=1,foundOpenBracket=0;(operatorStack.length>0)&&keepLooping;)
           {
-            if (operatorStack.length>0)
+            memcpy(&temp,operatorStack.back,sizeof(struct Token));
+            if (temp.type!=TOKEN_BRACKET)
             {
-              memcpy(&temp,operatorStack.back,sizeof(struct Token));
-              if (temp.type!=TOKEN_BRACKET)
+              popBack(&operatorStack,NULL);
+              pushBack(pOutStack,&temp);
+            }
+            else
+            {
+              if (temp.uToken.sBracket.open)
               {
                 popBack(&operatorStack,NULL);
-                pushBack(pOutStack,&temp);
-              }
-              else
-              {
-                if (temp.uToken.sBracket.open)
-                {
-                  popBack(&operatorStack,NULL);
-                  keepLooping=0;
-                }
+                keepLooping=0;
+				foundOpenBracket=1;
               }
             }
           }
+		  if (foundOpenBracket==0)
+		  {
+		    printf("ERROR: bracket mismatch\n");
+			return -1;
+		  }
         }
       break;
       case TOKEN_ASSIGNMENT:
@@ -1337,7 +1341,6 @@ void doTest(char* input)
 
 int main(int argc, char* argv[])
 {
-  doTest("25 + 4 * 7 - 17*1/1 + 20  / 10 * 5 -7");
-
+  doTest("10 - 8/2) * 4");
   return 0;
 }
