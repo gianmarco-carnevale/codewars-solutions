@@ -1314,11 +1314,16 @@ int evaluate(char *input, Type *result)
 }
 
 
-int main(int argc, char* argv[])
+void doTest(char* input)
 {
   struct Token r;
-  getTokenResult("25 + 4 * 7 - 17*1/1 + 20  / 10 * 5 -7",&r);
+  getTokenResult(input,&r);
   printToken(&r,&iList);printf("\n");
+}
+
+int main(int argc, char* argv[])
+{
+  doTest("25 + 4 * 7 - 17*1/1 + 20  / 10 * 5 -7");
 
   return 0;
 }
