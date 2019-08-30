@@ -29,6 +29,8 @@ struct BracketStruct;
 struct Token;
 struct IdentifierData;
 struct IdentifierList;
+struct TokenBlock;
+struct TokenStack;
 /*--------------------------------------------------------*/
 union NumberUnion
 {
@@ -100,16 +102,41 @@ struct TokenList
 };
 
 /*--------------------------------------------------------*/
+struct TokenBlock
+{
+  struct Token t;
+  struct TokenBlock* prev;
+  struct TokenBlock* next;
+};
+
+/*--------------------------------------------------------*/
+struct TokenStack
+{
+  int length;
+  struct TokenBlock* front;
+  struct TokenBlock* back;
+};
+
+/*--------------------------------------------------------*/
 static int addId(struct IdentifierList* p, char* newName)
 {
   struct IdentifierData* temp;
   char* tempString;
   if (newName==NULL)
+  {
+    printf("ERROR: null string for identifier name\n");
     return -1;
+  }
   if (strlen(newName)==0)
+  {
+    printf("ERROR: empty string for identifier name\n");
     return -1;
+  }
   if (p==NULL)
+  {
+    printf("ERROR: null pointer for identifier list\n");
     return -1;
+  }
   if (p->list==NULL)
   {
     p->length=0;
@@ -139,18 +166,30 @@ static int addId(struct IdentifierList* p, char* newName)
   return 0;
 }
 
-/*--------------------------------------------------------*/
+/*-----------------------------------------------------------*/
 static int findId(struct IdentifierList* p, char* newName)
 {
   int i;
   if (p==NULL)
+  {
+    printf("ERROR: null pointer for identifier list\n");
     return -1;
+  }
   if (p->list==NULL)
+  {
+    printf("ERROR: null identifier list\n");
     return -1;
+  }
   if (newName==NULL)
+  {
+    printf("ERROR: null pointer for new name\n");
     return -1;
+  }
   if (strlen(newName)==0)
+  {
+    printf("ERROR: empty new name\n");
     return -1;
+  }
   for (i=0;i<p->length;++i)
   {
     if (strcmp(newName,p->list[i].name)==0)
@@ -159,15 +198,24 @@ static int findId(struct IdentifierList* p, char* newName)
   return -1;
 }
 
-/*--------------------------------------------------------*/
+/*------------------------------------------------------------------------------------*/
 static int putValue(struct IdentifierList* p, int id, struct NumberStruct *pNumber)
 {
   if (p==NULL)
+  {
+    printf("ERROR: null pointer for identifier list\n");
     return -1;
+  }
   if (id>=p->length)
+  {
+    printf("ERROR: id exceeds length\n");
     return -1;
+  }
   if (id<0)
+  {
+    printf("ERROR: negative id\n");
     return -1;
+  }
   memcpy(&(p->list[id].sNumber),pNumber,sizeof(struct NumberStruct));
   p->list[id].numberIsValid=1;
   return 0;
@@ -192,8 +240,6 @@ static void clearIdList(struct IdentifierList* p)
 }
 
 /*------------------------------------------------------------------------------------------------------*/
-
-
 static int addToken(struct TokenList *pList, const struct Token* pToken)
 {
   struct Token* temp;
@@ -241,7 +287,7 @@ static void clearTokenList(struct TokenList *pList)
 }
 
 /*------------------------------------------------------------------------------------------------------*/
-static int popFront(struct TokenList *pList, struct Token* pToken)
+static int popListFromFront(struct TokenList *pList, struct Token* pToken)
 {
   struct Token* temp;
   int i;
@@ -279,6 +325,7 @@ static int isIdChar(char c)
   return 0;
 }
 
+/*---------------------------------------------------------------------------------------------*/
 static int isNumeric(char c)
 {
   if (isdigit(c))
@@ -288,6 +335,7 @@ static int isNumeric(char c)
   return 0;
 }
 
+/*---------------------------------------------------------------------------------------------*/
 static int makeNumberFromString(struct IdentifierList* pList, struct Token *pToken, char* s)
 {
   char *end;
@@ -320,6 +368,7 @@ static int makeNumberFromString(struct IdentifierList* pList, struct Token *pTok
   return -1;
 }
 
+/*-------------------------------------------------------------------------------------------------*/
 static int makeIdentifierFromString(struct IdentifierList* pList, struct Token *pToken, char* s)
 {
   int temp;
@@ -341,6 +390,7 @@ static int makeIdentifierFromString(struct IdentifierList* pList, struct Token *
   }
 }
 
+/*-------------------------------------------------------------------------------------------------*/
 static void makeIntegerNumber(struct Token *p, long int n)
 {
   p->type = TOKEN_NUMBER;
@@ -348,6 +398,7 @@ static void makeIntegerNumber(struct Token *p, long int n)
   p->uToken.sNumber.uNumber.intValue = n;
 }
 
+/*-------------------------------------------------------------------------------------------------*/
 static void makeFloatNumber(struct Token *p, double n)
 {
   p->type = TOKEN_NUMBER;
@@ -355,34 +406,39 @@ static void makeFloatNumber(struct Token *p, double n)
   p->uToken.sNumber.uNumber.floatValue = n;
 }
 
+/*-------------------------------------------------------------------------------------------------*/
 static void makeIdentifierFromId(struct Token *p, int id)
 {
   p->type = TOKEN_IDENTIFIER;
   p->uToken.sIdentifier.id = id;
 }
 
+/*-------------------------------------------------------------------------------------------------*/
 static void makeOperator(struct Token *p, int opcode)
 {
   p->type = TOKEN_OPERATOR;
   p->uToken.sOperator.opcode = opcode;
 }
 
+/*-------------------------------------------------------------------------------------------------*/
 static void makeBracket(struct Token *p, int open)
 {
   p->type = TOKEN_BRACKET;
   p->uToken.sBracket.open = open;
 }
 
+/*-------------------------------------------------------------------------------------------------*/
 static void makeAssignment(struct Token *p)
 {
   p->type = TOKEN_ASSIGNMENT;
 }
+
 /*------------------------------------------------------------------------------------------------------*/
 #define STATE_AWAITING_FIRST_CHARACTER      0
 #define STATE_PUTTING_TOGETHER_IDENTIFIER   1
 #define STATE_PUTTING_TOGETHER_NUMBER       2
 #define STATE_PROCESSING_SYMBOLS            3
-
+/*------------------------------------------------------------------------------------------------------*/
 static int makeTokenList(char* input, struct TokenList* pTokenList, struct IdentifierList* pIdList)
 {
   int state;
@@ -577,6 +633,7 @@ static int makeTokenList(char* input, struct TokenList* pTokenList, struct Ident
   return -1;
 }
 
+/*------------------------------------------------------------------------------------------------------*/
 static void printToken(const struct Token* p, const struct IdentifierList* pIdList)
 {
   if (p==NULL)
@@ -623,6 +680,7 @@ static void printToken(const struct Token* p, const struct IdentifierList* pIdLi
   }
 }
 
+/*----------------------------------------------------------------------------------------------------*/
 static void printTokenList(const struct TokenList* pTokenList, const struct IdentifierList* pIdList)
 {
   int i;
@@ -637,21 +695,8 @@ static void printTokenList(const struct TokenList* pTokenList, const struct Iden
   printf("\n");
 }
 
-struct TokenBlock
-{
-  struct Token t;
-  struct TokenBlock* prev;
-  struct TokenBlock* next;
-};
-
-struct TokenStack
-{
-  int length;
-  struct TokenBlock* front;
-  struct TokenBlock* back;
-};
-
-static int push(struct TokenStack* pStack, const struct Token* pToken)
+/*---------------------------------------------------------------------------------------------*/
+static int pushBack(struct TokenStack* pStack, const struct Token* pToken)
 {
   struct TokenBlock* temp;
   if (pStack==NULL)
@@ -661,7 +706,7 @@ static int push(struct TokenStack* pStack, const struct Token* pToken)
   temp = (struct TokenBlock*)malloc(sizeof(struct TokenBlock));
   if (temp==NULL)
   {
-    printf("ERROR: malloc failed in push\n");
+    printf("ERROR: malloc failed in pushBack\n");
     return -1;
   }
   memcpy(&(temp->t),pToken,sizeof(struct Token));
@@ -686,7 +731,8 @@ static int push(struct TokenStack* pStack, const struct Token* pToken)
   return 0;
 }
 
-static int pop(struct TokenStack* pStack, struct Token* pToken)
+/*---------------------------------------------------------------------------------------------*/
+static int popBack(struct TokenStack* pStack, struct Token* pToken)
 {
   struct TokenBlock *temp;
   if (pStack==NULL)
@@ -712,6 +758,52 @@ static int pop(struct TokenStack* pStack, struct Token* pToken)
   return 0;
 }
 
+/*---------------------------------------------------------------------------------------------*/
+static int popFront(struct TokenStack* pStack, struct Token* pToken)
+{
+  struct TokenBlock *temp;
+  if (pStack==NULL)
+    return -1;
+  if (pStack->front==NULL)
+    return -1;
+  if (pToken!=NULL)
+  {
+    memcpy(pToken,&(pStack->front->t),sizeof(struct Token));
+  }
+  temp = pStack->front->next;
+  if (temp)
+  {
+    temp->prev = NULL;
+  }
+  free(pStack->front);
+  pStack->front = temp;
+  if (pStack->length==1)
+  {
+    pStack->back = pStack->front;
+  }
+  pStack->length-=1;
+  return 0;
+}
+
+/*---------------------------------------------------------------------------------------------*/
+static void printStack(const struct TokenStack* pStack, const struct IdentifierList* pIdList)
+{
+  struct TokenBlock *temp;
+  if (pStack==NULL)
+    return;
+  printf(": ");
+  if (pStack->length>0)
+  {
+    for (temp=pStack->front;temp;temp=temp->next)
+    {
+      printToken(&temp->t,pIdList);
+      printf(", ");
+    }
+    printf("\n");
+  }
+}
+
+/*---------------------------------------------------------------------------------*/
 static int getPriority(const struct Token* p)
 {
   if (p->type==TOKEN_ASSIGNMENT)
@@ -720,8 +812,8 @@ static int getPriority(const struct Token* p)
   {
     switch (p->uToken.sOperator.opcode)
     {
-      case TOKEN_OPERATOR_NEGATE: return 4;
-      case TOKEN_OPERATOR_MULTIPLY: return 3;
+      case TOKEN_OPERATOR_NEGATE: return 5;
+      case TOKEN_OPERATOR_MULTIPLY: return 4;
       case TOKEN_OPERATOR_DIVIDE: return 3;
       case TOKEN_OPERATOR_PLUS: return 2;
       case TOKEN_OPERATOR_MINUS: return 2;
@@ -732,14 +824,15 @@ static int getPriority(const struct Token* p)
   return -1;
 }
 
-
+/*---------------------------------------------------------------------------------*/
 static int higherPrecedence(const struct Token* first, const struct Token* second)
 {
-  if (getPriority(first)>=getPriority(second))
+  if (getPriority(first) >= getPriority(second))
     return 1;
   return 0;
 }
 
+/*---------------------------------------------------------------------------------------------------------------------------------------*/
 static int numberOperation(const struct NumberStruct* first, const struct NumberStruct* second, int opcode, struct NumberStruct* result)
 {
   long int tempValue, tempRemainder;
@@ -821,9 +914,11 @@ static int numberOperation(const struct NumberStruct* first, const struct Number
   return -1;
 }
 
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 static int executeOperation(const struct Token* first, const struct Token* second, const struct Token* operation, struct Token* result, const struct IdentifierList* pIdList)
 {
   struct NumberStruct temp1, temp2;
+  printf("executeOperation: ");printToken(first,pIdList);printf(", ");printToken(second,pIdList);printf(", ");printToken(operation,pIdList);printf("\n");
   if (operation->type == TOKEN_ASSIGNMENT)
   {
     if (first->type == TOKEN_IDENTIFIER)
@@ -834,6 +929,8 @@ static int executeOperation(const struct Token* first, const struct Token* secon
         {
           pIdList->list[first->uToken.sIdentifier.id].sNumber = pIdList->list[second->uToken.sIdentifier.id].sNumber;
           pIdList->list[first->uToken.sIdentifier.id].numberIsValid=1;
+          result->type = TOKEN_NUMBER;
+          result->uToken.sNumber = pIdList->list[first->uToken.sIdentifier.id].sNumber;
           return 0;
         }
         else
@@ -848,6 +945,8 @@ static int executeOperation(const struct Token* first, const struct Token* secon
         {
           pIdList->list[first->uToken.sIdentifier.id].sNumber = second->uToken.sNumber;
           pIdList->list[first->uToken.sIdentifier.id].numberIsValid=1;
+          result->type = TOKEN_NUMBER;
+          result->uToken.sNumber = pIdList->list[first->uToken.sIdentifier.id].sNumber;
           return 0;
         }
         else
@@ -951,70 +1050,75 @@ static int executeOperation(const struct Token* first, const struct Token* secon
   return 0;
 }
 
-
-static int flushStack(struct TokenStack* pStack, struct Token* result, struct IdentifierList* pIdList)
+/*----------------------------------------------------------------------------------------------------*/
+static int executeStack(struct TokenStack* pStack, struct Token* result, struct IdentifierList* pIdList)
 {
   struct Token operation, temp, first, second;
-  printf("flushStack hadling %i items\n",pStack->length);
+  struct TokenStack localStack = {0,NULL,NULL};
   for (;pStack->length>0;)
   {
-    pop(pStack,&temp);
-    printf("flushStack processing ");printToken(&temp,pIdList);printf("\n");fflush(stdout);
-    if (temp.type == TOKEN_OPERATOR)
+    popFront(pStack,&temp);
+    switch (temp.type)
     {
-      if (temp.uToken.sOperator.opcode == TOKEN_OPERATOR_NEGATE)
-      {
-        if (pStack->length<1)
+      case TOKEN_NUMBER:
+      case TOKEN_IDENTIFIER:
+        pushBack(&localStack,&temp);
+      break;
+      case TOKEN_OPERATOR:
+        if (temp.uToken.sOperator.opcode == TOKEN_OPERATOR_NEGATE)
         {
-          printf("ERROR: underflow\n");
+          if (localStack.length<1)
+          {
+            printf("ERROR: underflow (1)\n");
+            return -1;
+          }
+          popBack(&localStack,&first);
+          operation = temp;
+          if (executeOperation(&first, NULL, &operation, &temp, pIdList))
+          {
+            printf("ERROR: executeOperation in executeStack (1)\n");
+            return -1;
+          }
+          pushBack(&localStack,&temp);
+        }
+        else
+        {
+          if (localStack.length<2)
+          {
+            printf("ERROR: underflow (2)\n");
+            return -1;
+          }
+          popBack(&localStack,&second);
+          popBack(&localStack,&first);
+          operation = temp;
+          if (executeOperation(&first, &second, &operation, &temp, pIdList))
+          {
+            printf("ERROR: executeOperation in executeStack (2)\n");
+            return -1;
+          }
+          pushBack(&localStack,&temp);
+        }
+      break;
+      case TOKEN_ASSIGNMENT:
+        if (localStack.length<2)
+        {
+          printf("ERROR: underflow (3)\n");
           return -1;
         }
-        pop(pStack,&first);
-        operation = temp;
-        if (executeOperation(&first, NULL, &operation, &temp, pIdList))
-        {
-          printf("ERROR: executeOperation in flush\n");
-          return -1;
-        }
-        push(pStack,&temp);
-      }
-      else
-      {
-        if (pStack->length<2)
-        {
-          printf("ERROR: underflow\n");
-          return -1;
-        }
-        pop(pStack,&second);
-        pop(pStack,&first);
-        operation = temp;
-        if (executeOperation(&first, &second, &operation, &temp, pIdList))
-        {
-          printf("ERROR: executeOperation in flush\n");
-          return -1;
-        }
-        push(pStack,&temp);
-      }
-    }
-    else
-    {
-      if (temp.type == TOKEN_ASSIGNMENT)
-      {
-        if (pStack->length<2)
-        {
-          printf("ERROR: underflow\n");
-          return -1;
-        }
-        pop(pStack,&second);
-        pop(pStack,&first);
+        popBack(&localStack,&second);
+        popBack(&localStack,&first);
         operation = temp;
         if (executeOperation(&first, &second, &operation,&temp, pIdList))
         {
-          printf("ERROR: executeOperation in flush\n");
+          printf("ERROR: executeOperation in flush (3)\n");
           return -1;
         }
-        push(pStack,&temp);
-      }
+        pushBack(&localStack,&temp);
+      break;
+      default:
+       printf("ERROR: unhandled type %i in executeStack\n",temp.type);
+       return -1;
+      break;
     }
   }
   *result = temp;
@@ -1024,84 +1128,76 @@ static int flushStack(struct TokenStack* pStack, struct Token* result, struct Id
   return 0;
 }
 
-
-static int executeList(struct TokenList* pList, struct Token* result, struct IdentifierList* pIdList, int openBracket)
+/*---------------------------------------------------------------------------------------------------------------------------------------------------------*/
+static int buildReverseStack(struct TokenList* pList, struct TokenStack* pOutStack, struct IdentifierList* pIdList)
 {
   struct Token next, operation, temp;
-  struct TokenStack output = {0,NULL,NULL};
-  struct TokenStack opStack = {0,NULL,NULL};
   int keepLooping;
-  for (keepLooping=1;(pList->length>0) && keepLooping;)
+  struct TokenStack operatorStack = {0,NULL,NULL};
+  for (;pList->length>0;)
   {
-    if (popFront(pList,&next))
+    if (popListFromFront(pList,&next))
     {
-      printf("ERROR: popFront failed in executeList\n");
+      printf("ERROR: popListFromFront failed in buildReverseStack\n");
       return -1;
     }
-    printf("Next==");
-    printToken(&next,pIdList);
-    printf("\n");
-    fflush(stdout);
     switch (next.type)
     {
       case TOKEN_IDENTIFIER:
       case TOKEN_NUMBER:
-        push(&output,&next);
+        pushBack(pOutStack,&next);
       break;
       case TOKEN_BRACKET:
         if (next.uToken.sBracket.open)
         {
-          if (executeList(pList,&temp,pIdList,1))
-          {
-            printf("ERROR: executeList recursion failed\n");
-            return -1;
-          }
-          push(&output,&temp);
+          pushBack(&operatorStack,&next);
         }
         else
         {
-          if (openBracket)
+          for (keepLooping=1;keepLooping;)
           {
-            for (;opStack.length>0;)
+            if (operatorStack.length>0)
             {
-              pop(&opStack,&temp);
-              push(&output,&temp);
-              keepLooping = 0;
+              memcpy(&temp,operatorStack.back,sizeof(struct Token));
+              if (temp.type!=TOKEN_BRACKET)
+              {
+                popBack(&operatorStack,NULL);
+                pushBack(pOutStack,&temp);
+              }
+              else
+              {
+                if (temp.uToken.sBracket.open)
+                {
+                  popBack(&operatorStack,NULL);
+                  keepLooping=0;
+                }
+              }
             }
-          }
-          else
-          {
-            printf("ERROR: bracket mismatch\n");
-            return -1;
           }
         }
       break;
       case TOKEN_ASSIGNMENT:
       case TOKEN_OPERATOR:
-        if (opStack.length>0)
+        if (operatorStack.length>0)
         {
-          memcpy(&temp,opStack.back,sizeof(struct Token));
+          memcpy(&temp,operatorStack.back,sizeof(struct Token));
           if (higherPrecedence(&temp,&next))
           {
-            pop(&opStack,NULL);
-            push(&output,&temp);
+            popBack(&operatorStack,NULL);
+            pushBack(pOutStack,&temp);
           }
         }
-        push(&opStack,&next);
+        pushBack(&operatorStack,&next);
       break;
       default:
         printf("ERROR: unhandled type %i in executeList\n",next.type);
         return -1;
     }
   }
-  for (;opStack.length>0;)
+  for (;operatorStack.length>0;)
   {
-    pop(&opStack,&temp);
-    push(&output,&temp);
-  }
-  if (flushStack(&output,result,pIdList))
-  {
-    return -1;
+    popBack(&operatorStack,&temp);
+    pushBack(pOutStack,&temp);
   }
   return 0;
 }
@@ -1110,6 +1206,7 @@ static int evaluate(char* input, struct Token* result)
 {
   struct TokenList tList = {0,NULL};
   static struct IdentifierList iList = {0,NULL};
+  struct TokenStack outputStack = {0,NULL,NULL};
   if ((input==NULL)&&(result==NULL))
   {
     clearIdList(&iList);
@@ -1122,7 +1219,14 @@ static int evaluate(char* input, struct Token* result)
     return -1;
   }
   printTokenList(&tList,&iList);
-  if (executeList(&tList, result, &iList, 0))
+  if (buildReverseStack(&tList, &outputStack, &iList))
+  {
+    clearTokenList(&tList);
+    return -1;
+  }
+  printf("output");
+  printStack(&outputStack,&iList);
+  if (executeStack(&outputStack,result,&iList))
   {
     clearTokenList(&tList);
     return -1;
@@ -1131,12 +1235,19 @@ static int evaluate(char* input, struct Token* result)
   return 0;
 }
 
-
 int main(int argc, char* argv[])
 {
-  char input[] = "5+6*7";
+  char input[] = "x=7+8*(4+5*3)";
   struct Token r;
   if (evaluate(input,&r)==0)
+  {
+    printf("%li\n",r.uToken.sNumber.uNumber.intValue);
+  }
+  else
+  {
+    printf("ERROR: evaluate\n");
+  }
+  if (evaluate("x=x+1",&r)==0)
   {
     printf("%li\n",r.uToken.sNumber.uNumber.intValue);
   }
