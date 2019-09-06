@@ -202,4 +202,28 @@ static int getOpcode(char* name)
   {}
 }
 
+int parseLine(char* input)
+{
+  char c;
+  int state;
+  if (input==NULL)
+	return -1;
+  for (state=0;;)
+  {
+    c = input[0];
+	switch (state)
+	{
+	  case 0:
+	    if ((c==0)||(c==';'))
+		  return 0;
+		if (isalpha(c))
+		  state=1;
+		if ((c=='-')||isdigit(c))
+		  state=2;
+	  break;
+	  case 1:
+	  break;
+	}
+  }
+}
 
