@@ -32,27 +32,59 @@ ret - when a ret is found in a subroutine, the instruction pointer should return
 msg 'Register: ', x - this instruction stores the output of the program. It may contain text strings (delimited by single quotes) and registers. The number of arguments isn't limited and will vary, depending on the program.
 end - this instruction indicates that the program ends correctly, so the stored output is returned (if the program terminates without this instruction it should return the default output: see below).
 ; comment - comments should not be taken in consideration during the execution of the program.
-
-
-
-
-
 */
 
 
 /*-------------------------------------------------------------------------------------------------------------*/
-
-
 struct Label
 {
   char* name;
   int counter;
 };
 
+/*----------------------------*/
 struct Dictionary
 {
   int length;
   struct Label* list;
+};
+
+/*----------------------------*/
+struct Token
+{
+  int type;
+  int value;
+  char* name;
+};
+
+/*----------------------------*/
+struct Instruction
+{
+  int length;
+  struct Token* list;
+};
+
+/*----------------------------*/
+struct Program
+{
+  int length;
+  struct Instruction** list;
+};
+
+/*----------------------------*/
+struct Cpu
+{
+  int registers[26];
+  int comparison;
+  int counter;
+};
+
+/*----------------------------*/
+#define STACK_LENGTH 32
+struct CallStack
+{
+  int position;
+  int data[STACK_LENGTH];
 };
 
 /*-------------------------------------------------------------------------------------------------------------*/
@@ -72,7 +104,7 @@ static int addLabel(struct Dictionary* pDict, char* labelName, int value)
   }
   if (labelName==NULL)
   {
-    printf("ERROR: null string for label name\n");
+    printf("ERROR: null pointer for label name\n");
     return -1;
   }
   if (strlen(labelName)==0)
@@ -98,7 +130,7 @@ static int addLabel(struct Dictionary* pDict, char* labelName, int value)
   tempString = (char*)malloc(sizeof(char)*(1+strlen(labelName)));
   if (tempString==NULL)
   {
-    printf("ERROR: allocation 2 in addId\n");
+    printf("ERROR: allocation (2) in addLabel\n");
     return -1;
   }
   strcpy(tempString,labelName);
@@ -142,25 +174,6 @@ static int getProgramCounter(struct Dictionary* pDict, char* labelName)
   printf("ERROR: failed to find label %s\n",labelName);
   return -1;
 }
-/*-------------------------------------------------------------------------------------------------------------*/
-struct Token
-{
-  int type;
-  int value;
-  char* name;
-};
-
-struct Instruction
-{
-  int length;
-  struct Token* list;
-};
-
-struct Program
-{
-  int length;
-  struct Instruction** list;
-};
 
 /*-------------------------------------------------------------------------------------------------------------*/
 static int copyToken(struct Token* dst, struct Token* src)
@@ -181,22 +194,26 @@ static int copyToken(struct Token* dst, struct Token* src)
     dst->name=NULL;
   dst->name = (char*)malloc((1+strlen(src->name))*sizeof(char));
   if (dst->name==NULL)
+  {
+    printf("ERROR: allocation in copyToken\n");
     return -1;
+  }
   strcpy(dst->name,src->name);
   return 0;
 }
+
 /*-------------------------------------------------------------------------------------------------------------*/
 static int addToken(struct Instruction* pInstr, struct Token* pToken)
 {
   struct Token* temp;
   if (pToken==NULL)
   {
-    printf("ERROR: null token\n");
+    printf("ERROR: null token in addTokenn");
     return -1;
   }
   if (pInstr==NULL)
   {
-    printf("ERROR: null pointer for instruction\n");
+    printf("ERROR: null pointer for instruction in addToken\n");
     return -1;
   }
   if (pInstr->list==NULL)
@@ -217,24 +234,25 @@ static int addToken(struct Instruction* pInstr, struct Token* pToken)
   temp = &(pInstr->list[pInstr->length]);
   if (copyToken(temp,pToken))
   {
-    printf("ERROR: failed to copy\n");
+    printf("ERROR: failed to copy in addToken\n");
     return -1;
   }
   pInstr->length += 1;
   return 0;
 }
+
 /*-------------------------------------------------------------------------------------------------------------*/
 static int addInstruction(struct Program* pProg, struct Instruction* pInstr)
 {
   struct Instruction** temp;
   if (pInstr==NULL)
   {
-    printf("ERROR: null instruction\n");
+    printf("ERROR: null pointer for instruction in addInstruction\n");
     return -1;
   }
   if (pProg==NULL)
   {
-    printf("ERROR: null pointer for program\n");
+    printf("ERROR: null pointer for program in addInstruction\n");
     return -1;
   }
   if (pProg->list==NULL)
@@ -248,7 +266,7 @@ static int addInstruction(struct Program* pProg, struct Instruction* pInstr)
   }
   if (temp==NULL)
   {
-    printf("ERROR: allocation (1) in addInstruction\n");
+    printf("ERROR: allocation in addInstruction\n");
     return -1;
   }
   pProg->list = temp;
@@ -305,7 +323,6 @@ static int getOpcode(char* name)
   return -1;
 }
 
-
 /*-------------------------------------------------------------------------------------------------------------*/
 static int getRegId(char* name)
 {
@@ -319,13 +336,14 @@ static int getRegId(char* name)
 }
 
 /*-------------------------------------------------------------------------------------------------------------*/
-#define  STATE_AWAITING_FIRST_CHARACTER   0
-#define  STATE_PUTTING_LABEL_TOGETHER     1
-#define  STATE_PUTTING_NUMBER_TOGETHER    2
-#define  STATE_PUTTING_STRING_TOGETHER    3
-#define  STATE_AWAITING_COLON             4
-#define  STATE_AWAITING_COMMA             5
-#define  STATE_ERROR                      6
+#define  STATE_LINE_AWAITING_FIRST_CHARACTER   0
+#define  STATE_LINE_PUTTING_LABEL_TOGETHER     1
+#define  STATE_LINE_PUTTING_NUMBER_TOGETHER    2
+#define  STATE_LINE_PUTTING_STRING_TOGETHER    3
+#define  STATE_LINE_AWAITING_COLON             4
+#define  STATE_LINE_AWAITING_COMMA             5
+#define  STATE_LINE_ERROR                      6
+
 static struct Instruction* parseLine(char* input, char* labelName)
 {
   char c;
@@ -337,21 +355,31 @@ static struct Instruction* parseLine(char* input, char* labelName)
   struct Instruction* result=NULL;
   struct Token token;
   if (input==NULL)
+  {
+    printf("ERROR: null string pointer in parseLine\n");
     return NULL;
+  }
   if (strlen(input)==0)
+  {
+    printf("ERROR: empty string in parseLine\n");
     return NULL;
+  }
   result = (struct Instruction*)malloc(sizeof(struct Instruction));
   if (result==NULL)
+  {
+    printf("ERROR: malloc failed in parseLine\n");
     return NULL;
+  }
   result->length=0;
   result->list=NULL;
   localLabel[0]=0;
-  for (strIndex=0,state=STATE_AWAITING_FIRST_CHARACTER;;)
+  for (strIndex=0,state=STATE_LINE_AWAITING_FIRST_CHARACTER;;)
   {
     c = input[0];
     switch (state)
     {
-      case STATE_AWAITING_FIRST_CHARACTER:
+      /*-------------------------------------------------------------------*/
+      case STATE_LINE_AWAITING_FIRST_CHARACTER:
         if (c!=' ')
         {
           if ((c==0)||(c==';'))
@@ -366,7 +394,7 @@ static struct Instruction* parseLine(char* input, char* labelName)
           {
             localString[strIndex++]=c;
             ++input;
-            state=STATE_PUTTING_LABEL_TOGETHER;
+            state=STATE_LINE_PUTTING_LABEL_TOGETHER;
           }
           else
           {
@@ -374,31 +402,32 @@ static struct Instruction* parseLine(char* input, char* labelName)
             {
               localString[strIndex++]=c;
               ++input;
-              state=STATE_PUTTING_NUMBER_TOGETHER;
+              state=STATE_LINE_PUTTING_NUMBER_TOGETHER;
             }
             else
             {
               if (c=='\'')
-			  {
-			    state=STATE_PUTTING_STRING_TOGETHER;
-				strIndex=0;
-				++input;
-			  }
-			  else
-			  {
-			    state=STATE_ERROR;
-			  }
+              {
+                state=STATE_LINE_PUTTING_STRING_TOGETHER;
+                strIndex=0;
+                ++input;
+              }
+              else
+              {
+                state=STATE_LINE_ERROR;
+              }
             }
           }
         }
       break;
-      case STATE_PUTTING_LABEL_TOGETHER:
+      /*-------------------------------------------------------------------*/
+      case STATE_LINE_PUTTING_LABEL_TOGETHER:
         if ((isalpha(c))||(isdigit(c))||(c=='_'))
         {
           if (strIndex>strLength-1)
           {
             printf("ERROR: string exceeds limits (1)\n");
-            state=STATE_ERROR;
+            state=STATE_LINE_ERROR;
           }
           else
           {
@@ -417,7 +446,7 @@ static struct Instruction* parseLine(char* input, char* labelName)
             token.type = TOKEN_INSTRUCTION;
             token.value = id;
             addToken(result,&token);
-            state = STATE_AWAITING_FIRST_CHARACTER;
+            state = STATE_LINE_AWAITING_FIRST_CHARACTER;
           }
           else
           {
@@ -429,23 +458,24 @@ static struct Instruction* parseLine(char* input, char* labelName)
               token.type = TOKEN_REGISTER;
               token.value = id;
               addToken(result,&token);
-              state = STATE_AWAITING_FIRST_CHARACTER;
+              state = STATE_LINE_AWAITING_FIRST_CHARACTER;
             }
             else
             {
               /* it's a label */
-              state = STATE_AWAITING_COLON;
+              state = STATE_LINE_AWAITING_COLON;
             }
           }
         }
       break;
-      case STATE_PUTTING_NUMBER_TOGETHER:
+      /*-------------------------------------------------------------------*/
+      case STATE_LINE_PUTTING_NUMBER_TOGETHER:
         if (isdigit(c))
         {
           if (strIndex>strLength-1)
           {
             printf("ERROR: string exceeds limits (2)\n");
-            state=STATE_ERROR;
+            state=STATE_LINE_ERROR;
           }
           else
           {
@@ -463,93 +493,98 @@ static struct Instruction* parseLine(char* input, char* labelName)
             localString[0]=0;
             strIndex=0;
             addToken(result,&token);
-            state = STATE_AWAITING_FIRST_CHARACTER;
+            state = STATE_LINE_AWAITING_FIRST_CHARACTER;
           }
           else
           {
-            state = STATE_ERROR;
+            state = STATE_LINE_ERROR;
           }
         }
       break;
-	  case STATE_PUTTING_STRING_TOGETHER:
-	    if (c=='\'')
-		{
-		  localString[strIndex]=0;
-		  strIndex=0;
-		  token.type = TOKEN_STRING;
+      /*-------------------------------------------------------------------*/
+      case STATE_LINE_PUTTING_STRING_TOGETHER:
+        if (c=='\'')
+        {
+          localString[strIndex]=0;
+          strIndex=0;
+          token.type = TOKEN_STRING;
           token.value = 0;
-		  token.name = localString;
-		  addToken(result,&token);
-		  localString[0]=0;
-		  state=STATE_ERROR;
-		}
+          token.name = localString;
+          addToken(result,&token);
+          localString[0]=0;
+          state=STATE_LINE_ERROR;
+        }
         if (strIndex>strLength-1)
         {
           printf("ERROR: text exceeds limits\n");
-          state=STATE_ERROR;
+          state=STATE_LINE_ERROR;
         }
         else
         {
           localString[strIndex++]=c;
           ++input;
         }
-	  break;
-	  break;
-      case STATE_AWAITING_COLON:
-      if (c!=' ')
-      {
-        if (c==':')
+      break;
+      /*-------------------------------------------------------------------*/
+      case STATE_LINE_AWAITING_COLON:
+        if (c!=' ')
         {
-          strcpy(localLabel,localString);
-          strIndex=0;
-          localString[0]=0;
-          state = STATE_AWAITING_FIRST_CHARACTER;
+          if (c==':')
+          {
+            strcpy(localLabel,localString);
+            strIndex=0;
+            localString[0]=0;
+            state = STATE_LINE_AWAITING_FIRST_CHARACTER;
+          }
+          else
+          {
+            state = STATE_LINE_ERROR;
+          }
         }
         else
         {
-          state = STATE_ERROR;
+          ++input;
         }
-      }
-	  else
-	  {
-	    ++input;
-	  }
       break;
-	  case STATE_AWAITING_COMMA:
-		if (c!=' ')
-		{
-		  if (c==',')
-		  {
-		    ++input;
-			state = STATE_AWAITING_FIRST_CHARACTER;
-		  }
-		  else
-		  {
-		    if ((c==0)||(c==';'))
-			{
-			  return result;
-			}
-			else
-			{
-			  state = STATE_ERROR;
-			}
-		  }
-		}
-		else
-		{
-		  ++input;
-		}
-	  break;
-      case STATE_ERROR:
+      /*-------------------------------------------------------------------*/
+      case STATE_LINE_AWAITING_COMMA:
+        if (c!=' ')
+        {
+          if (c==',')
+          {
+            ++input;
+            state = STATE_LINE_AWAITING_FIRST_CHARACTER;
+          }
+          else
+          {
+            if ((c==0)||(c==';'))
+            {
+              return result;
+            }
+            else
+            {
+              state = STATE_LINE_ERROR;
+            }
+          }
+        }
+        else
+        {
+          ++input;
+        }
       break;
+      /*-------------------------------------------------------------------*/
+      case STATE_LINE_ERROR:
+      break;
+      /*-------------------------------------------------------------------*/
       default:
-        state = STATE_ERROR;
+        state = STATE_LINE_ERROR;
       break;
     }
   }
   return NULL;
 }
 
+/*-------------------------------------------------------------------------------------------------------------*/
 static int parseProgram(const char* input, struct Program* pProg, struct Dictionary* pDict)
 {
   struct Instruction* pInstr;
@@ -559,6 +594,7 @@ static int parseProgram(const char* input, struct Program* pProg, struct Diction
   char c;
   if (input==NULL)
   {
+    printf("ERROR: null string pointer in parseProgram\n");
     return -1;
   }
   for (index=0;;++input)
@@ -595,21 +631,7 @@ static int parseProgram(const char* input, struct Program* pProg, struct Diction
   return -1;
 }
 
-
-struct Cpu
-{
-  int registers[26];
-  int comparison;
-  int counter;
-};
-
-#define STACK_LENGTH 32
-struct CallStack
-{
-  int position;
-  int data[STACK_LENGTH];
-};
-
+/*-------------------------------------------------------------------------------------------------------------*/
 static int push(struct CallStack* pStack, int value)
 {
   if (pStack->position==STACK_LENGTH-1)
@@ -621,6 +643,7 @@ static int push(struct CallStack* pStack, int value)
   return 0;
 }
 
+/*-------------------------------------------------------------------------------------------------------------*/
 static int pop(struct CallStack* pStack)
 {
   if (pStack->position==0)
@@ -631,6 +654,7 @@ static int pop(struct CallStack* pStack)
   return pStack->data[pStack->position--];
 }
 
+/*-------------------------------------------------------------------------------------------------------------*/
 static int compare(int a, int b)
 {
   if (a==b) return 0;
@@ -638,249 +662,253 @@ static int compare(int a, int b)
   return -1;
 }
 
+/*-------------------------------------------------------------------------------------------------------------*/
 static int unaryOperation(int opcode, struct Token* p, struct Cpu* pCpu)
 {
   switch (opcode)
   {
     case OPCODE_INC:
-	  if (p->type==TOKEN_REGISTER)
-	  {
-	    pCpu->registers[p->value] += 1;
-		return 0;
-	  }
-	break;
+      if (p->type==TOKEN_REGISTER)
+      {
+        pCpu->registers[p->value] += 1;
+        return 0;
+      }
+    break;
     case OPCODE_DEC:
-	  if (p->type==TOKEN_REGISTER)
-	  {
-	    pCpu->registers[p->value] -= 1;
-		return 0;
-	  }
-	break;
-	default:break;
+      if (p->type==TOKEN_REGISTER)
+      {
+        pCpu->registers[p->value] -= 1;
+        return 0;
+      }
+    break;
+    default:break;
   }
   return -1;
 }
 
+/*-------------------------------------------------------------------------------------------------------------*/
 static int binaryOperation(int opcode, struct Token* p1, struct Token* p2, struct Cpu* pCpu)
 {
   switch (opcode)
   {
     case OPCODE_MOV:
-	  if (p1->type==TOKEN_REGISTER)
-	  {
-	    if (p2->type==TOKEN_REGISTER)
-		{
-		  pCpu->registers[p1->value] = pCpu->registers[p2->value];
-		  return 0;
-		}
-		else
-		{
-		  if (p2->type==TOKEN_CONSTANT)
-		  {
-		    pCpu->registers[p1->value] = p2->value;
-			return 0;
-		  }
-		}
-	  }
-	break;
+      if (p1->type==TOKEN_REGISTER)
+      {
+        if (p2->type==TOKEN_REGISTER)
+        {
+          pCpu->registers[p1->value] = pCpu->registers[p2->value];
+          return 0;
+        }
+        else
+        {
+          if (p2->type==TOKEN_CONSTANT)
+          {
+            pCpu->registers[p1->value] = p2->value;
+            return 0;
+          }
+        }
+      }
+    break;
     case OPCODE_ADD:
-	  if (p1->type==TOKEN_REGISTER)
-	  {
-	    if (p2->type==TOKEN_REGISTER)
-		{
-		  pCpu->registers[p1->value] += pCpu->registers[p2->value];
-		  return 0;
-		}
-		else
-		{
-		  if (p2->type==TOKEN_CONSTANT)
-		  {
-		    pCpu->registers[p1->value] += p2->value;
-			return 0;
-		  }
-		}
-	  }
-	break;
+      if (p1->type==TOKEN_REGISTER)
+      {
+        if (p2->type==TOKEN_REGISTER)
+        {
+          pCpu->registers[p1->value] += pCpu->registers[p2->value];
+          return 0;
+        }
+        else
+        {
+          if (p2->type==TOKEN_CONSTANT)
+          {
+            pCpu->registers[p1->value] += p2->value;
+            return 0;
+          }
+        }
+      }
+    break;
     case OPCODE_SUB:
-	  if (p1->type==TOKEN_REGISTER)
-	  {
-	    if (p2->type==TOKEN_REGISTER)
-		{
-		  pCpu->registers[p1->value] -= pCpu->registers[p2->value];
-		  return 0;
-		}
-		else
-		{
-		  if (p2->type==TOKEN_CONSTANT)
-		  {
-		    pCpu->registers[p1->value] -= p2->value;
-			return 0;
-		  }
-		}
-	  }
-	break;
+      if (p1->type==TOKEN_REGISTER)
+      {
+        if (p2->type==TOKEN_REGISTER)
+        {
+          pCpu->registers[p1->value] -= pCpu->registers[p2->value];
+          return 0;
+        }
+        else
+        {
+          if (p2->type==TOKEN_CONSTANT)
+          {
+            pCpu->registers[p1->value] -= p2->value;
+            return 0;
+          }
+        }
+      }
+    break;
     case OPCODE_MUL:
-	  if (p1->type==TOKEN_REGISTER)
-	  {
-	    if (p2->type==TOKEN_REGISTER)
-		{
-		  pCpu->registers[p1->value] *= pCpu->registers[p2->value];
-		  return 0;
-		}
-		else
-		{
-		  if (p2->type==TOKEN_CONSTANT)
-		  {
-		    pCpu->registers[p1->value] *= p2->value;
-			return 0;
-		  }
-		}
-	  }
-	break;
+      if (p1->type==TOKEN_REGISTER)
+      {
+        if (p2->type==TOKEN_REGISTER)
+        {
+          pCpu->registers[p1->value] *= pCpu->registers[p2->value];
+          return 0;
+        }
+        else
+        {
+          if (p2->type==TOKEN_CONSTANT)
+          {
+            pCpu->registers[p1->value] *= p2->value;
+            return 0;
+          }
+        }
+      }
+    break;
     case OPCODE_DIV:
-	  if (p1->type==TOKEN_REGISTER)
-	  {
-	    if (p2->type==TOKEN_REGISTER)
-		{
-		  pCpu->registers[p1->value] /= pCpu->registers[p2->value];
-		  return 0;
-		}
-		else
-		{
-		  if (p2->type==TOKEN_CONSTANT)
-		  {
-		    pCpu->registers[p1->value] /= p2->value;
-			return 0;
-		  }
-		}
-	  }
-	break;
+      if (p1->type==TOKEN_REGISTER)
+      {
+        if (p2->type==TOKEN_REGISTER)
+        {
+          pCpu->registers[p1->value] /= pCpu->registers[p2->value];
+          return 0;
+        }
+        else
+        {
+          if (p2->type==TOKEN_CONSTANT)
+          {
+            pCpu->registers[p1->value] /= p2->value;
+            return 0;
+          }
+        }
+      }
+    break;
     case OPCODE_CMP:
-	  if (p1->type==TOKEN_REGISTER)
-	  {
-	    if (p2->type==TOKEN_REGISTER)
-		{
-		  pCpu->flag = compare(pCpu->registers[p1->value],pCpu->registers[p2->value]);
-		  return 0;
-		}
-		else
-		{
-		  if (p2->type==TOKEN_CONSTANT)
-		  {
-		    pCpu->flag = compare(pCpu->registers[p1->value],p2->value);
-			return 0;
-		  }
-		}
-	  }
-	  else
-	  {
-	    if (p1->type==TOKEN_CONSTANT)
-		{
-	      if (p2->type==TOKEN_REGISTER)
-		  {
-		    pCpu->flag = compare(p1->value,pCpu->registers[p2->value]);
-			return 0;
-		  }
-		  else
-		  {
-		    if (p2->type==TOKEN_CONSTANT)
-			{
-			  pCpu->flag = compare(p1->value,p2->value);
-			  return 0;
-			}
-		  }
-		}
-	  }
-	break;
-	default:break;
+      if (p1->type==TOKEN_REGISTER)
+      {
+        if (p2->type==TOKEN_REGISTER)
+        {
+          pCpu->comparison = compare(pCpu->registers[p1->value],pCpu->registers[p2->value]);
+          return 0;
+        }
+        else
+        {
+          if (p2->type==TOKEN_CONSTANT)
+          {
+            pCpu->comparison = compare(pCpu->registers[p1->value],p2->value);
+            return 0;
+          }
+        }
+      }
+      else
+      {
+        if (p1->type==TOKEN_CONSTANT)
+        {
+          if (p2->type==TOKEN_REGISTER)
+          {
+            pCpu->comparison = compare(p1->value,pCpu->registers[p2->value]);
+            return 0;
+          }
+          else
+          {
+            if (p2->type==TOKEN_CONSTANT)
+            {
+              pCpu->comparison = compare(p1->value,p2->value);
+              return 0;
+            }
+          }
+        }
+      }
+    break;
+    default:break;
   }
   return -1;
 }
 
+/*-------------------------------------------------------------------------------------------------------------*/
 int branchOperation(int opcode, int value, struct Cpu* pCpu, struct CallStack* pCallStack)
 {
   switch (opcode)
   {
     case OPCODE_JNE:
-	  if (pCpu->flag)
-	  {
-	    pCpu->counter = value;
-	  }
-	  else
-	  {
-	    ++pCpu->counter;
-	  }
-	break;
+      if (pCpu->comparison)
+      {
+        pCpu->counter = value;
+      }
+      else
+      {
+        ++pCpu->counter;
+      }
+    break;
     case OPCODE_JE:
-	  if (pCpu->flag==0)
-	  {
-	    pCpu->counter = value;
-	  }
-	  else
-	  {
-	    ++pCpu->counter;
-	  }
-	break;
+      if (pCpu->comparison==0)
+      {
+        pCpu->counter = value;
+      }
+      else
+      {
+        ++pCpu->counter;
+      }
+    break;
     case OPCODE_JGE:
-	  if (pCpu->flag<=0)
-	  {
-	    pCpu->counter = value;
-	  }
-	  else
-	  {
-	    ++pCpu->counter;
-	  }
-	break;
+      if (pCpu->comparison<=0)
+      {
+        pCpu->counter = value;
+      }
+      else
+      {
+        ++pCpu->counter;
+      }
+    break;
     case OPCODE_JG:
-	  if (pCpu->flag<0)
-	  {
-	    pCpu->counter = value;
-	  }
-	  else
-	  {
-	    ++pCpu->counter;
-	  }
-	break;
+      if (pCpu->comparison<0)
+      {
+        pCpu->counter = value;
+      }
+      else
+      {
+        ++pCpu->counter;
+      }
+    break;
     case OPCODE_JLE:
-	  if (pCpu->flag>=0)
-	  {
-	    pCpu->counter = value;
-	  }
-	  else
-	  {
-	    ++pCpu->counter;
-	  }
-	break;
+      if (pCpu->comparison>=0)
+      {
+        pCpu->counter = value;
+      }
+      else
+      {
+        ++pCpu->counter;
+      }
+    break;
     case OPCODE_JL:
-	  if (pCpu->flag>0)
-	  {
-	    pCpu->counter = value;
-	  }
-	  else
-	  {
-	    ++pCpu->counter;
-	  }
-	break;
+      if (pCpu->comparison>0)
+      {
+        pCpu->counter = value;
+      }
+      else
+      {
+        ++pCpu->counter;
+      }
+    break;
     case OPCODE_JMP:
-	  pCpu->counter = value;
-	break;
+      pCpu->counter = value;
+    break;
     case OPCODE_CALL:
-	  push(pCallStack,pCpu->counter+1);
-	  pCpu->counter = value;
-	break;
-	default:break;
+      push(pCallStack,pCpu->counter+1);
+      pCpu->counter = value;
+    break;
+    default:break;
   }
   return -1;
 }
 
-#define STATE_AWAITING_OPCODE      0
-#define STATE_AWAITING_ARG1        1
-#define STATE_AWAITING_ARG2        2
-#define STATE_AWAITING_ARG1_ONLY   3
-#define STATE_AWAITING_LABEL       4
-#define STATE_AWAITING_TO_PRINT    5
-#define STATE_GOT_ERROR            6
-#define STATE_DONE                 7
+/*-------------------------------------------------------------------------------------------------------------*/
+#define STATE_INSTR_AWAITING_OPCODE      0
+#define STATE_INSTR_AWAITING_ARG1        1
+#define STATE_INSTR_AWAITING_ARG2        2
+#define STATE_INSTR_AWAITING_ARG1_ONLY   3
+#define STATE_INSTR_AWAITING_LABEL       4
+#define STATE_INSTR_AWAITING_TO_PRINT    5
+#define STATE_INSTR_ERROR                6
+#define STATE_INSTR_DONE                 7
 
 static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDict, struct Cpu* pCpu, struct CallStack* pCallStack)
 {
@@ -889,28 +917,38 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
   int opcode;
   int state;
   int value;
-  for (state=STATE_AWAITING_OPCODE,i=0;i;++i)
+  for (state=STATE_INSTR_AWAITING_OPCODE,i=0;i;++i)
   {
     switch (state)
     {
-      case STATE_AWAITING_OPCODE:
+      /*------------------------------------------------------------*/
+      case STATE_INSTR_AWAITING_OPCODE:
         if (pInstr->list[i].type==TOKEN_INSTRUCTION)
         {
           opcode = pInstr->list[i].value;
-		  switch (opcode)
+          switch (opcode)
           {
+            /*-------------------------------------------------*/
             case OPCODE_MOV:
             case OPCODE_ADD:
             case OPCODE_SUB:
             case OPCODE_MUL:
             case OPCODE_DIV:
             case OPCODE_CMP:
-              state = STATE_AWAITING_ARG1;
+              if (pInstr->length==3)
+                state = STATE_INSTR_AWAITING_ARG1;
+              else
+                state = STATE_INSTR_ERROR;
             break;
-			case OPCODE_INC:
+            /*-------------------------------------------------*/
+            case OPCODE_INC:
             case OPCODE_DEC:
-              state = STATE_AWAITING_ARG1_ONLY;
+              if (pInstr->length==2)
+                state = STATE_INSTR_AWAITING_ARG1_ONLY;
+              else
+                state = STATE_INSTR_ERROR;
             break;
+            /*-------------------------------------------------*/
             case OPCODE_JNE:
             case OPCODE_JE:
             case OPCODE_JGE:
@@ -919,71 +957,87 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
             case OPCODE_JL:
             case OPCODE_JMP:
             case OPCODE_CALL:
-              state = STATE_AWAITING_LABEL;
+              if (pInstr->length==2)
+                state = STATE_INSTR_AWAITING_LABEL;
+              else
+                state = STATE_INSTR_ERROR;
             break;
+            /*-------------------------------------------------*/
             case OPCODE_RET:
-              	value = pop(pCallStack);
-				if (value==-1)
-				{
-				  state = STATE_GOT_ERROR;
-				}
-				else
-				{
-				  pCpu->counter = value;
-				  state = STATE_DONE;
-				}
+                if (pInstr->length==1)
+                {
+                  value = pop(pCallStack);
+                  if (value==-1)
+                  {
+                    state = STATE_INSTR_ERROR;
+                  }
+                  else
+                  {
+                    pCpu->counter = value;
+                    state = STATE_INSTR_DONE;
+                  }
+                }
+                else
+                  state = STATE_INSTR_ERROR;
             break;
+            /*-------------------------------------------------*/
             case OPCODE_MSG:
-              state = STATE_AWAITING_TO_PRINT;
+              state = STATE_INSTR_AWAITING_TO_PRINT;
             break;
+            /*-------------------------------------------------*/
             case OPCODE_END:
-              state = STATE_DONE;
+              if (pInstr->length==1)
+                state = STATE_INSTR_DONE;
+              else
+                state = STATE_INSTR_ERROR;
             break;
+            /*-------------------------------------------------*/
             default:
             break;
           }
         }
         else
         {
-          state = STATE_GOT_ERROR;
+          state = STATE_INSTR_ERROR;
         }
       break;
-      case STATE_AWAITING_ARG1_ONLY:
+      /*------------------------------------------------------------*/
+      case STATE_INSTR_AWAITING_ARG1_ONLY:
         arg1 = pInstr->list[i];
-		if (unaryOperation(opcode,arg1))
-		  state = STATE_GOT_ERROR;
-		else
-          state = STATE_DONE;
+        if (unaryOperation(opcode,&arg1,pCpu))
+          state = STATE_INSTR_ERROR;
+        else
+          state = STATE_INSTR_DONE;
       break;
-      case STATE_AWAITING_ARG1:
-	    arg1 = pInstr->list[i];
-        state = STATE_AWAITING_ARG2;
+      case STATE_INSTR_AWAITING_ARG1:
+        arg1 = pInstr->list[i];
+        state = STATE_INSTR_AWAITING_ARG2;
       break;
-      case STATE_AWAITING_ARG2:
+      case STATE_INSTR_AWAITING_ARG2:
         arg2 = pInstr->list[i];
-		if (binaryOperation(opcode,arg1,arg2))
-          state = STATE_GOT_ERROR;
-		else
-		  state = STATE_DONE;
+        if (binaryOperation(opcode,&arg1,&arg2,pCpu))
+          state = STATE_INSTR_ERROR;
+        else
+          state = STATE_INSTR_DONE;
       break;
-      case STATE_AWAITING_LABEL:
-	    if (pInstr->list[i].type == TOKEN_STRING)
-		{
-		  value = getProgramCounter(pDict,pInstr->list[i].name);
-		  if (value>=0)
-		  {
-		    if (branchOperation(opcode,value,pCpu,pCallStack))
-			  state = STATE_GOT_ERROR;
-			else
-			  state = STATE_DONE;
-		  }
-		  else
-            state = STATE_GOT_ERROR;
-		}
-		else
-		  state = STATE_GOT_ERROR;
+      case STATE_INSTR_AWAITING_LABEL:
+        if (pInstr->list[i].type == TOKEN_STRING)
+        {
+          value = getProgramCounter(pDict,pInstr->list[i].name);
+          if (value>=0)
+          {
+            if (branchOperation(opcode,value,pCpu,pCallStack))
+              state = STATE_INSTR_ERROR;
+            else
+              state = STATE_INSTR_DONE;
+          }
+          else
+            state = STATE_INSTR_ERROR;
+        }
+        else
+          state = STATE_INSTR_ERROR;
       break;
-      case STATE_AWAITING_TO_PRINT:
+      case STATE_INSTR_AWAITING_TO_PRINT:
         if (pInstr->list[i].type==TOKEN_STRING)
         {
           printf("%s",pInstr->list[i].name);
@@ -1000,13 +1054,16 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
           }
         }
       break;
-      case STATE_GOT_ERROR:
+      /*------------------------------------------------------------*/
+      case STATE_INSTR_ERROR:
         return -1;
       break;
-      case STATE_DONE:
+      /*------------------------------------------------------------*/
+      case STATE_INSTR_DONE:
         printf("ERROR: no more arguments expected\n");
         return -1;
       break;
+      /*------------------------------------------------------------*/
       default:
         return -1;
       break;
@@ -1015,6 +1072,7 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
   return -1;
 }
 
+/*-------------------------------------------------------------------------------------------------------------*/
 static void executeProgram(struct Program* pProg, struct Dictionary* pDict)
 {
   struct Cpu cpu = {{0},0,0};
@@ -1022,11 +1080,11 @@ static void executeProgram(struct Program* pProg, struct Dictionary* pDict)
   struct Instruction* pInstr;
   for (;;)
   {
-	pInstr = pProg->list[cpu.counter];
-	if (pInstr==NULL)
-	{
-	  return;
-	}
+    pInstr = pProg->list[cpu.counter];
+    if (pInstr==NULL)
+    {
+      return;
+    }
     if (executeInstruction(pInstr,pDict,&cpu,&callStack))
     {
       return;
@@ -1034,6 +1092,7 @@ static void executeProgram(struct Program* pProg, struct Dictionary* pDict)
   }
 }
 
+/*-------------------------------------------------------------------------------------------------------------*/
 int assembler(const char* input)
 {
   struct Program program = {0,NULL};
@@ -1042,14 +1101,13 @@ int assembler(const char* input)
   {
     return -1;
   }
-  executeProgram(&program,&dictionary));
+  executeProgram(&program,&dictionary);
   return 0;
 }
 
+/*-------------------------------------------------------------------------------------------------------------*/
 int main(int argc, char* argv[])
 {
   return 0;
 }
-
-
 
