@@ -344,16 +344,17 @@ static int getRegId(char* name)
 #define  STATE_LINE_AWAITING_COMMA             5
 #define  STATE_LINE_ERROR                      6
 
-static struct Instruction* parseLine(char* input, char* labelName)
+static struct Instruction* parseLine(const char* input, char* labelName)
 {
   char c;
   int state, strIndex, id;
-  const int strLength = 64;
-  char localString[strLength];
+  const int maxStringLength = 64;
+  char localString[maxStringLength];
   char* end;
-  char localLabel[strLength];
-  struct Instruction* result=NULL;
+  char localLabel[maxStringLength];
   struct Token token;
+  struct Instruction* result=NULL;
+  int lastWasComma;
   if (input==NULL)
   {
     printf("ERROR: null string pointer in parseLine\n");
@@ -373,9 +374,10 @@ static struct Instruction* parseLine(char* input, char* labelName)
   result->length=0;
   result->list=NULL;
   localLabel[0]=0;
-  for (strIndex=0,state=STATE_LINE_AWAITING_FIRST_CHARACTER;;)
+  for (lastWasComma=0,strIndex=0,state=STATE_LINE_AWAITING_FIRST_CHARACTER;;)
   {
     c = input[0];
+    printf("Processing character %c in state %i\n",c,state);
     switch (state)
     {
       /*-------------------------------------------------------------------*/
@@ -384,47 +386,64 @@ static struct Instruction* parseLine(char* input, char* labelName)
         {
           if ((c==0)||(c==';'))
           {
-            if (strlen(localLabel)>0)
+            if (lastWasComma)
             {
-              strcpy(labelName,localLabel);
-            }
-            return result;
-          }
-          if (isalpha(c))
-          {
-            localString[strIndex++]=c;
-            ++input;
-            state=STATE_LINE_PUTTING_LABEL_TOGETHER;
-          }
-          else
-          {
-            if ((c=='-')||isdigit(c))
-            {
-              localString[strIndex++]=c;
-              ++input;
-              state=STATE_LINE_PUTTING_NUMBER_TOGETHER;
+              printf("ERROR: comma ending the line\n");
+              state=STATE_LINE_ERROR;
             }
             else
             {
-              if (c=='\'')
+              if (strlen(localLabel)>0)
               {
-                state=STATE_LINE_PUTTING_STRING_TOGETHER;
-                strIndex=0;
+                strcpy(labelName,localLabel);
+              }
+              return result;
+            }
+          }
+          else
+          {
+            lastWasComma=0;
+            if ((isalpha(c)) || (c=='_'))
+            {
+              localString[strIndex++]=c;
+              ++input;
+              state=STATE_LINE_PUTTING_LABEL_TOGETHER;
+            }
+            else
+            {
+              if ((c=='-')||isdigit(c))
+              {
+                localString[strIndex++]=c;
                 ++input;
+                state=STATE_LINE_PUTTING_NUMBER_TOGETHER;
               }
               else
               {
-                state=STATE_LINE_ERROR;
+                if (c=='\'')
+                {
+                  state=STATE_LINE_PUTTING_STRING_TOGETHER;
+                  strIndex=0;
+                  ++input;
+                }
+                else
+                {
+                  printf("ERROR: unexpected character %c\n",c);
+                  state=STATE_LINE_ERROR;
+                }
               }
             }
           }
         }
+        else
+        {
+		  ++input;
+        }
       break;
       /*-------------------------------------------------------------------*/
       case STATE_LINE_PUTTING_LABEL_TOGETHER:
-        if ((isalpha(c))||(isdigit(c))||(c=='_'))
+        if ((isalnum(c))||(c=='_'))
         {
-          if (strIndex>strLength-1)
+          if (strIndex>maxStringLength-1)
           {
             printf("ERROR: string exceeds limits (1)\n");
             state=STATE_LINE_ERROR;
@@ -458,7 +477,7 @@ static struct Instruction* parseLine(char* input, char* labelName)
               token.type = TOKEN_REGISTER;
               token.value = id;
               addToken(result,&token);
-              state = STATE_LINE_AWAITING_FIRST_CHARACTER;
+              state = STATE_LINE_AWAITING_COMMA;
             }
             else
             {
@@ -472,7 +491,7 @@ static struct Instruction* parseLine(char* input, char* labelName)
       case STATE_LINE_PUTTING_NUMBER_TOGETHER:
         if (isdigit(c))
         {
-          if (strIndex>strLength-1)
+          if (strIndex>maxStringLength-1)
           {
             printf("ERROR: string exceeds limits (2)\n");
             state=STATE_LINE_ERROR;
@@ -493,10 +512,11 @@ static struct Instruction* parseLine(char* input, char* labelName)
             localString[0]=0;
             strIndex=0;
             addToken(result,&token);
-            state = STATE_LINE_AWAITING_FIRST_CHARACTER;
+            state = STATE_LINE_AWAITING_COMMA;
           }
           else
           {
+            printf("ERROR: failed to get constant value from %s\n",localString);
             state = STATE_LINE_ERROR;
           }
         }
@@ -512,17 +532,20 @@ static struct Instruction* parseLine(char* input, char* labelName)
           token.name = localString;
           addToken(result,&token);
           localString[0]=0;
-          state=STATE_LINE_ERROR;
-        }
-        if (strIndex>strLength-1)
-        {
-          printf("ERROR: text exceeds limits\n");
-          state=STATE_LINE_ERROR;
+          state=STATE_LINE_AWAITING_COMMA;
         }
         else
         {
-          localString[strIndex++]=c;
-          ++input;
+          if (strIndex>maxStringLength-1)
+          {
+            printf("ERROR: string exceeds limits (3)\n");
+            state=STATE_LINE_ERROR;
+          }
+          else
+          {
+            localString[strIndex++]=c;
+            ++input;
+          }
         }
       break;
       /*-------------------------------------------------------------------*/
@@ -538,12 +561,13 @@ static struct Instruction* parseLine(char* input, char* labelName)
           }
           else
           {
+            printf("ERROR: unexpected character %c while waiting for colon\n",c);
             state = STATE_LINE_ERROR;
           }
         }
         else
         {
-          ++input;
+		  ++input;
         }
       break;
       /*-------------------------------------------------------------------*/
@@ -552,7 +576,8 @@ static struct Instruction* parseLine(char* input, char* labelName)
         {
           if (c==',')
           {
-            ++input;
+			++input;
+            lastWasComma=1;
             state = STATE_LINE_AWAITING_FIRST_CHARACTER;
           }
           else
@@ -563,20 +588,24 @@ static struct Instruction* parseLine(char* input, char* labelName)
             }
             else
             {
+              printf("ERROR: unexpected character %c while waiting for comma\n",c);
               state = STATE_LINE_ERROR;
             }
           }
         }
         else
         {
-          ++input;
+		  ++input;
         }
       break;
       /*-------------------------------------------------------------------*/
       case STATE_LINE_ERROR:
+        printf("ERROR: parseLine exiting with error\n");
+        return NULL;
       break;
       /*-------------------------------------------------------------------*/
       default:
+	    printf("ERROR: unexpected state %i in parseLine\n",state);
         state = STATE_LINE_ERROR;
       break;
     }
@@ -588,7 +617,8 @@ static struct Instruction* parseLine(char* input, char* labelName)
 static int parseProgram(const char* input, struct Program* pProg, struct Dictionary* pDict)
 {
   struct Instruction* pInstr;
-  char instructionLine[80];
+  static const int maxLineLength = 80;
+  char instructionLine[maxLineLength];
   int index;
   char label[64];
   char c;
@@ -597,7 +627,7 @@ static int parseProgram(const char* input, struct Program* pProg, struct Diction
     printf("ERROR: null string pointer in parseProgram\n");
     return -1;
   }
-  for (index=0;;++input)
+  for (index=0;;)
   {
     c=input[0];
     switch (c)
@@ -623,8 +653,16 @@ static int parseProgram(const char* input, struct Program* pProg, struct Diction
         }
       break;
       default:
-        instructionLine[index++]=c;
-        ++input;
+        if (index>maxLineLength-1)
+        {
+          printf("ERROR: program line exceeds maximum length\n");
+          return -1;
+        }
+        else
+        {
+          instructionLine[index++]=c;
+          ++input;
+        }
       break;
     }
   }
@@ -964,21 +1002,23 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
             break;
             /*-------------------------------------------------*/
             case OPCODE_RET:
-                if (pInstr->length==1)
+              if (pInstr->length==1)
+              {
+                value = pop(pCallStack);
+                if (value<0)
                 {
-                  value = pop(pCallStack);
-                  if (value==-1)
-                  {
-                    state = STATE_INSTR_ERROR;
-                  }
-                  else
-                  {
-                    pCpu->counter = value;
-                    state = STATE_INSTR_DONE;
-                  }
+                  state = STATE_INSTR_ERROR;
                 }
                 else
-                  state = STATE_INSTR_ERROR;
+                {
+                  pCpu->counter = value;
+                  state = STATE_INSTR_DONE;
+                }
+              }
+              else
+              {
+                state = STATE_INSTR_ERROR;
+              }
             break;
             /*-------------------------------------------------*/
             case OPCODE_MSG:
@@ -1009,10 +1049,12 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
         else
           state = STATE_INSTR_DONE;
       break;
+      /*------------------------------------------------------------*/
       case STATE_INSTR_AWAITING_ARG1:
         arg1 = pInstr->list[i];
         state = STATE_INSTR_AWAITING_ARG2;
       break;
+      /*------------------------------------------------------------*/
       case STATE_INSTR_AWAITING_ARG2:
         arg2 = pInstr->list[i];
         if (binaryOperation(opcode,&arg1,&arg2,pCpu))
@@ -1020,6 +1062,7 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
         else
           state = STATE_INSTR_DONE;
       break;
+      /*------------------------------------------------------------*/
       case STATE_INSTR_AWAITING_LABEL:
         if (pInstr->list[i].type == TOKEN_STRING)
         {
@@ -1037,6 +1080,7 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
         else
           state = STATE_INSTR_ERROR;
       break;
+      /*------------------------------------------------------------*/
       case STATE_INSTR_AWAITING_TO_PRINT:
         if (pInstr->list[i].type==TOKEN_STRING)
         {
@@ -1108,6 +1152,8 @@ int assembler(const char* input)
 /*-------------------------------------------------------------------------------------------------------------*/
 int main(int argc, char* argv[])
 {
+  const char pr[]="mov x,y";
+  assembler(pr);
   return 0;
 }
 
