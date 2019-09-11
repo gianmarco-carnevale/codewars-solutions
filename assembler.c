@@ -77,6 +77,8 @@ struct Cpu
   int registers[26];
   int comparison;
   int counter;
+#define OUTPUT_STRING_SIZE   256
+  char output[OUTPUT_STRING_SIZE];
 };
 
 /*----------------------------*/
@@ -171,8 +173,7 @@ static int getProgramCounter(struct Dictionary* pDict, char* labelName)
       return pDict->list[i].counter;
     }
   }
-  printf("ERROR: failed to find label %s\n",labelName);
-  return -1;
+  return -2;
 }
 
 /*-------------------------------------------------------------------------------------------------------------*/
@@ -355,14 +356,10 @@ static struct Instruction* parseLine(const char* input, char* labelName)
   struct Token token;
   struct Instruction* result=NULL;
   int lastWasComma;
+  int labelDeclaration;
   if (input==NULL)
   {
     printf("ERROR: null string pointer in parseLine\n");
-    return NULL;
-  }
-  if (strlen(input)==0)
-  {
-    printf("ERROR: empty string in parseLine\n");
     return NULL;
   }
   result = (struct Instruction*)malloc(sizeof(struct Instruction));
@@ -373,8 +370,12 @@ static struct Instruction* parseLine(const char* input, char* labelName)
   }
   result->length=0;
   result->list=NULL;
+  if (strlen(input)==0)
+  {
+    return result;
+  }
   localLabel[0]=0;
-  for (lastWasComma=0,strIndex=0,state=STATE_LINE_AWAITING_FIRST_CHARACTER;;)
+  for (labelDeclaration=1,lastWasComma=0,strIndex=0,state=STATE_LINE_AWAITING_FIRST_CHARACTER;;)
   {
     c = input[0];
     printf("Processing character %c in state %i\n",c,state);
@@ -466,6 +467,7 @@ static struct Instruction* parseLine(const char* input, char* labelName)
             token.value = id;
             addToken(result,&token);
             state = STATE_LINE_AWAITING_FIRST_CHARACTER;
+			labelDeclaration=0;
           }
           else
           {
@@ -481,8 +483,10 @@ static struct Instruction* parseLine(const char* input, char* labelName)
             }
             else
             {
-              /* it's a label */
-              state = STATE_LINE_AWAITING_COLON;
+              if (labelDeclaration)
+                state = STATE_LINE_AWAITING_COLON;
+			  else
+			    state = STATE_LINE_AWAITING_FIRST_CHARACTER;
             }
           }
         }
@@ -642,15 +646,22 @@ static int parseProgram(const char* input, struct Program* pProg, struct Diction
         {
           return -1;
         }
-        addInstruction(pProg,pInstr);
-        if (strlen(label)>0)
-        {
-          addLabel(pDict,label,pProg->length-1);
-        }
+		if (pInstr->length>0)
+		{
+		  addInstruction(pProg,pInstr);
+          if (strlen(label)>0)
+          {
+            addLabel(pDict,label,pProg->length-1);
+          }
+		}
         if (c==0)
         {
           return 0;
         }
+		else
+		{
+		  ++input;
+		}
       break;
       default:
         if (index>maxLineLength-1)
@@ -948,14 +959,15 @@ int branchOperation(int opcode, int value, struct Cpu* pCpu, struct CallStack* p
 #define STATE_INSTR_ERROR                6
 #define STATE_INSTR_DONE                 7
 
-static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDict, struct Cpu* pCpu, struct CallStack* pCallStack)
+static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDict, struct Cpu* pCpu, struct CallStack* pCallStack, int* pFinished)
 {
   int i;
   struct Token arg1, arg2;
   int opcode;
   int state;
   int value;
-  for (state=STATE_INSTR_AWAITING_OPCODE,i=0;i;++i)
+  int stringIndex;
+  for (state=STATE_INSTR_AWAITING_OPCODE,i=0;i<pInstr->length;++i)
   {
     switch (state)
     {
@@ -1022,12 +1034,15 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
             break;
             /*-------------------------------------------------*/
             case OPCODE_MSG:
+			  stringIndex=0;
               state = STATE_INSTR_AWAITING_TO_PRINT;
             break;
             /*-------------------------------------------------*/
             case OPCODE_END:
               if (pInstr->length==1)
-                state = STATE_INSTR_DONE;
+			  {
+				state = STATE_INSTR_DONE;
+			  }
               else
                 state = STATE_INSTR_ERROR;
             break;
@@ -1075,7 +1090,9 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
               state = STATE_INSTR_DONE;
           }
           else
+		  {
             state = STATE_INSTR_ERROR;
+		  }
         }
         else
           state = STATE_INSTR_ERROR;
@@ -1084,17 +1101,18 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
       case STATE_INSTR_AWAITING_TO_PRINT:
         if (pInstr->list[i].type==TOKEN_STRING)
         {
-          printf("%s",pInstr->list[i].name);
+          stringIndex += sprintf(&pCpu->output[stringIndex],"%s",pInstr->list[i].name);
         }
         else
         {
           if (pInstr->list[i].type==TOKEN_REGISTER)
           {
-            printf("%i",pInstr->list[i].value);
+            stringIndex += printf(&pCpu->output[stringIndex],"%i",pInstr->list[i].value);
           }
           else
           {
-            
+            printf("ERROR: unexpected token type % after msg\n",pInstr->list[i].type);
+			state = STATE_INSTR_ERROR;
           }
         }
       break;
@@ -1109,51 +1127,161 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
       break;
       /*------------------------------------------------------------*/
       default:
+	    printf("ERROR: unexpected state %i in executeInstruction\n",state);
         return -1;
       break;
     }
+  }
+  if ((state==STATE_INSTR_DONE)&&(opcode==OPCODE_END))
+  {
+    pFinished[0]=1;
+	return 0;
   }
   return -1;
 }
 
 /*-------------------------------------------------------------------------------------------------------------*/
-static void executeProgram(struct Program* pProg, struct Dictionary* pDict)
+static void deleteInstruction(struct Instruction* pInstr)
 {
-  struct Cpu cpu = {{0},0,0};
-  struct CallStack callStack = {0,{0}};
-  struct Instruction* pInstr;
-  for (;;)
+  int i;
+  if (pInstr)
   {
-    pInstr = pProg->list[cpu.counter];
-    if (pInstr==NULL)
-    {
-      return;
-    }
-    if (executeInstruction(pInstr,pDict,&cpu,&callStack))
-    {
-      return;
-    }
+	if (pInstr->list)
+	{
+	  for (i=0;i<pInstr->length;++i)
+	  {
+	    if (pInstr->list[i].name)
+		{
+		  free(pInstr->list[i].name);
+		}
+	  }
+	  free(pInstr->list);
+	  pInstr->list=NULL;
+	}
+	pInstr->length=0;
   }
 }
 
 /*-------------------------------------------------------------------------------------------------------------*/
-int assembler(const char* input)
+static void deleteProgram(struct Program* pProg)
+{
+  int i;
+  if (pProg)
+  {
+	if (pProg->list)
+	{
+	  for (i=0;i<pProg->length;++i)
+	  {
+	    if (pProg->list[i])
+		{
+		  deleteInstruction(pProg->list[i]);
+		}
+	  }
+	  free(pProg->list);
+	  pProg->list=NULL;
+	}
+	pProg->length=0;
+  }
+}
+
+/*-------------------------------------------------------------------------------------------------------------*/
+static void deleteDictionary(struct Dictionary* pDict)
+{
+  int i;
+  if (pDict)
+  {
+	if (pDict->list)
+	{
+	  for (i=0;i<pDict->length;++i)
+	  {
+	    if (pDict->list[i].name)
+		{
+		  free(pDict->list[i].name);
+		}
+	  }
+	  free(pDict->list);
+	  pDict->list=NULL;
+	}
+	pDict->length=0;
+  }
+}
+
+/*-------------------------------------------------------------------------------------------------------------*/
+static char* executeProgram(struct Program* pProg, struct Dictionary* pDict)
+{
+  struct Cpu cpu = {{0},0,0};
+  struct CallStack callStack = {0,{0}};
+  struct Instruction* pInstr;
+  static const size_t outStringSize = OUTPUT_STRING_SIZE * sizeof(char);
+  int finished;
+  char* result = (char*)malloc(outStringSize);
+  if (result==NULL)
+  {
+    printf("ERROR: malloc in executeProgram\n");
+	return (char*)(-1);
+  }
+  memset(result,0,outStringSize);
+  for (finished=0;finished==0;)
+  {
+    printf("Executing instruction at program counter %i\n",cpu.counter);
+    pInstr = pProg->list[cpu.counter];
+    if (pInstr==NULL)
+    {
+      printf("ERROR: null instruction\n");
+	  free(result);
+	  return (char*)(-1);
+    }
+    if (executeInstruction(pInstr,pDict,&cpu,&callStack,&finished))
+    {
+      printf("ERROR: malformed instruction\n");
+	  free(result);
+	  return (char*)(-1);
+    }
+  }
+  strcpy(result,&cpu.output[0]);
+  return result;
+}
+
+/*-------------------------------------------------------------------------------------------------------------*/
+char* assembler_interpreter(const char* input)
 {
   struct Program program = {0,NULL};
   struct Dictionary dictionary = {0,NULL};
+  char* result;
   if (parseProgram(input,&program,&dictionary))
   {
-    return -1;
+    return (char*)(-1);
   }
-  executeProgram(&program,&dictionary);
-  return 0;
+  result = executeProgram(&program,&dictionary);
+  deleteProgram(&program);
+  deleteDictionary(&dictionary);
+  return result;
 }
 
 /*-------------------------------------------------------------------------------------------------------------*/
 int main(int argc, char* argv[])
 {
-  const char pr[]="mov x,y";
-  assembler(pr);
+  const char myProgram[] = "; My first program\n"
+                    "mov  a, 5\n"
+                    "inc  a\n"
+                    "call function\n"
+                    "msg  '(5+1)/2 = ', a    ; output message\n"
+                    "end\n"
+                    "\n"
+                    "function:\n"
+                    "    div  a, 2\n"
+                    "    ret\n";
+  char* result;
+  result = assembler_interpreter(myProgram);
+  if (result==(char*)(-1))
+  {
+    printf("Program terminated not successfully\n");
+  }
+  else
+  {
+    printf("Program output: %s\n",result);
+	free(result);
+  }
   return 0;
 }
 
