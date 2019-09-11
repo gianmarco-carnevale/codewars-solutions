@@ -536,6 +536,7 @@ static struct Instruction* parseLine(const char* input, char* labelName)
           token.name = localString;
           addToken(result,&token);
           localString[0]=0;
+		  ++input;
           state=STATE_LINE_AWAITING_COMMA;
         }
         else
@@ -561,6 +562,7 @@ static struct Instruction* parseLine(const char* input, char* labelName)
             strcpy(localLabel,localString);
             strIndex=0;
             localString[0]=0;
+			++input;
             state = STATE_LINE_AWAITING_FIRST_CHARACTER;
           }
           else
