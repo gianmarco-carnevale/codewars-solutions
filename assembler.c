@@ -1378,6 +1378,7 @@ static char* executeProgram(struct Program* pProg, struct Dictionary* pDict)
   struct Instruction* pInstr;
   static const size_t outStringSize = OUTPUT_STRING_SIZE * sizeof(char);
   int finished;
+  int i;
   char* result = (char*)malloc(outStringSize);
   if (result==NULL)
   {
@@ -1390,7 +1391,7 @@ static char* executeProgram(struct Program* pProg, struct Dictionary* pDict)
   printf("------- Routine table --------\n");
   printDictionary(pDict);
   printf("----------------------------------------------------------------\n");
-  for (finished=1;finished==0;)
+  for (i=0,finished=0;i<7;++i)
   {
     printf("********************************************************\n");
     printf("Executing instruction at program counter %i\n",cpu.counter);
