@@ -800,19 +800,21 @@ static int push(struct CallStack* pStack, int value)
     printf("ERROR: stack is full\n");
     return -1;
   }
-  pStack->data[pStack->position++]=value;
+  pStack->data[++pStack->position]=value;
   return 0;
 }
 
 /*-------------------------------------------------------------------------------------------------------------*/
 static int pop(struct CallStack* pStack)
 {
-  if (pStack->position==0)
+  int result;
+  if (pStack->position<0)
   {
     printf("ERROR: stack is empty\n");
     return -1;
   }
-  return pStack->data[pStack->position--];
+  result = pStack->data[pStack->position--];
+  return result;
 }
 
 /*-------------------------------------------------------------------------------------------------------------*/
@@ -1071,6 +1073,7 @@ int branchOperation(int opcode, int value, struct Cpu* pCpu, struct CallStack* p
     break;
     case OPCODE_CALL:
       push(pCallStack,pCpu->counter+1);
+	  printf("Pushed %i\n",pCpu->counter+1);
       pCpu->counter = value;
     break;
     default:
@@ -1146,7 +1149,6 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
             break;
             /*-------------------------------------------------*/
             case OPCODE_RET:
-			  printf("Returning to pc %i\n",value);
               if (pInstr->length==1)
               {
                 value = pop(pCallStack);
@@ -1170,6 +1172,7 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
             case OPCODE_MSG:
               stringIndex=0;
               state = STATE_INSTR_AWAITING_TO_PRINT;
+			  pCpu->counter+=1;
             break;
             /*-------------------------------------------------*/
             case OPCODE_END:
@@ -1245,6 +1248,8 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
         {
           stringIndex += sprintf(&pCpu->output[stringIndex],"%s",pInstr->list[i].name);
 		  printf("Printing %s into output buffer\n",pInstr->list[i].name);
+		  if (i==pInstr->length-1)
+		    state = STATE_INSTR_DONE;
         }
         else
         {
@@ -1252,6 +1257,8 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
           {
             stringIndex += printf(&pCpu->output[stringIndex],"%i",pInstr->list[i].value);
 			printf("Printing %i into output buffer\n",pInstr->list[i].value);
+		    if (i==pInstr->length-1)
+		      state = STATE_INSTR_DONE;
           }
           else
           {
@@ -1374,7 +1381,7 @@ static void deleteDictionary(struct Dictionary* pDict)
 static char* executeProgram(struct Program* pProg, struct Dictionary* pDict)
 {
   struct Cpu cpu = {{0},0,0};
-  struct CallStack callStack = {0,{0}};
+  struct CallStack callStack = {-1,{0}};
   struct Instruction* pInstr;
   static const size_t outStringSize = OUTPUT_STRING_SIZE * sizeof(char);
   int finished;
@@ -1391,7 +1398,7 @@ static char* executeProgram(struct Program* pProg, struct Dictionary* pDict)
   printf("------- Routine table --------\n");
   printDictionary(pDict);
   printf("----------------------------------------------------------------\n");
-  for (i=0,finished=0;i<7;++i)
+  for (finished=0;finished==0;)
   {
     printf("********************************************************\n");
     printf("Executing instruction at program counter %i\n",cpu.counter);
