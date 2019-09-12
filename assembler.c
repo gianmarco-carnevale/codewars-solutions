@@ -90,90 +90,102 @@ struct CallStack
 };
 
 /*-------------------------------------------------------------------------------------------------------------*/
-static int addLabel(struct Dictionary* pDict, char* labelName, int value)
-{
-  struct Label* temp;
-  char* tempString;
-  if (value<0)
-  {
-    printf("ERROR: negative program counter\n");
-    return -1;
-  }
-  if (pDict==NULL)
-  {
-    printf("ERROR: null pointer for dictionary\n");
-    return -1;
-  }
-  if (labelName==NULL)
-  {
-    printf("ERROR: null pointer for label name\n");
-    return -1;
-  }
-  if (strlen(labelName)==0)
-  {
-    printf("ERROR: empty string for label name\n");
-    return -1;
-  }
-  if (pDict->list==NULL)
-  {
-    pDict->length=0;
-    temp = (struct Label*)malloc(sizeof(struct Label));
-  }
-  else
-  {
-    temp = (struct Label*)realloc(pDict->list,(pDict->length+1)*sizeof(struct Label));
-  }
-  if (temp==NULL)
-  {
-    printf("ERROR: allocation (1) in addLabel\n");
-    return -1;
-  }
-  pDict->list = temp;
-  tempString = (char*)malloc(sizeof(char)*(1+strlen(labelName)));
-  if (tempString==NULL)
-  {
-    printf("ERROR: allocation (2) in addLabel\n");
-    return -1;
-  }
-  strcpy(tempString,labelName);
-  pDict->list[pDict->length].name = tempString;
-  pDict->list[pDict->length].counter = value;
-  pDict->length += 1;
-  return 0;
-}
-
-/*-------------------------------------------------------------------------------------------------------------*/
-static int getProgramCounter(struct Dictionary* pDict, char* labelName)
+#define  ERROR_INVALID_INPUT   (-1)
+#define  ERROR_NOT_FOUND       (-2)
+static int findLabel(struct Dictionary* pDict, char* labelName)
 {
   int i;
   if (pDict==NULL)
   {
     printf("ERROR: null pointer for dictionary\n");
-    return -1;
-  }
-  if (pDict->list==NULL)
-  {
-    printf("ERROR: null list in dictionary\n");
-    return -1;
+    return ERROR_INVALID_INPUT;
   }
   if (labelName==NULL)
   {
     printf("ERROR: null pointer for label name\n");
-    return -1;
+    return ERROR_INVALID_INPUT;
   }
   if (strlen(labelName)==0)
   {
     printf("ERROR: empty label name\n");
-    return -1;
+    return ERROR_INVALID_INPUT;
+  }
+  if (pDict->list==NULL)
+  {
+    return ERROR_NOT_FOUND;
   }
   for (i=0;i<pDict->length;++i)
   {
     if (strcmp(labelName,pDict->list[i].name)==0)
     {
-      return pDict->list[i].counter;
+      return i;
     }
   }
-  return -2;
+  return ERROR_NOT_FOUND;
+}
+
+/*-------------------------------------------------------------------------------------------------------------*/
+static int addLabel(struct Dictionary* pDict, char* labelName, int value)
+{
+  struct Label* temp;
+  char* tempString;
+  int result;
+  result = findLabel(pDict,labelName);
+  if (result == ERROR_INVALID_INPUT)
+  {
+    printf("ERROR: invalid input in addLabel\n");
+    return -1;
+  }
+  if (result == ERROR_NOT_FOUND)
+  {
+    if (pDict->list==NULL)
+    {
+      pDict->length=0;
+      temp = (struct Label*)malloc(sizeof(struct Label));
+    }
+    else
+    {
+      temp = (struct Label*)realloc(pDict->list,(pDict->length+1)*sizeof(struct Label));
+    }
+    if (temp==NULL)
+    {
+      printf("ERROR: allocation (1) in addLabel\n");
+      return -1;
+    }
+    pDict->list = temp;
+    tempString = (char*)malloc(sizeof(char)*(1+strlen(labelName)));
+    if (tempString==NULL)
+    {
+      printf("ERROR: allocation (2) in addLabel\n");
+      return -1;
+    }
+    strcpy(tempString,labelName);
+    pDict->list[pDict->length].name = tempString;
+    pDict->list[pDict->length].counter = value;
+    pDict->length += 1;
+    return 0;
+  }
+  pDict->list[result].counter = value;
+  return 0;
+}
+
+/*-------------------------------------------------------------------------------------------------------------*/
+static int getProgramCounter(struct Dictionary* pDict, char* labelName, int *pCounter)
+{
+  int i, result;
+  result = findLabel(pDict,labelName);
+  if (result == ERROR_INVALID_INPUT)
+  {
+    printf("ERROR: invalid input in getProgramCounter\n");
+    return -1;
+  }
+  if (result == ERROR_NOT_FOUND)
+  {
+    printf("ERROR: label %s not found\n",labelName);
+    return -1;
+  }
+  pCounter[0] = pDict->list[result].counter;
+  return 0;
 }
 
 /*-------------------------------------------------------------------------------------------------------------*/
@@ -345,10 +357,10 @@ static int getRegId(char* name)
 #define  STATE_LINE_AWAITING_COMMA             5
 #define  STATE_LINE_ERROR                      6
 
-static struct Instruction* parseLine(const char* input, char* labelName)
+static struct Instruction* parseLine(const char* input, char* labelName, struct Dictionary* pDict)
 {
   char c;
-  int state, strIndex, id;
+  int state, strIndex, id, counterValue;
   const int maxStringLength = 64;
   char localString[maxStringLength];
   char* end;
@@ -375,6 +387,7 @@ static struct Instruction* parseLine(const char* input, char* labelName)
     return result;
   }
   localLabel[0]=0;
+  printf("--------------------------------------------------------------------\n");
   for (labelDeclaration=1,lastWasComma=0,strIndex=0,state=STATE_LINE_AWAITING_FIRST_CHARACTER;;)
   {
     c = input[0];
@@ -394,7 +407,7 @@ static struct Instruction* parseLine(const char* input, char* labelName)
             }
             else
             {
-              if (strlen(localLabel)>0)
+              if ((strlen(localLabel)>0)&& labelDeclaration)
               {
                 strcpy(labelName,localLabel);
               }
@@ -437,7 +450,7 @@ static struct Instruction* parseLine(const char* input, char* labelName)
         }
         else
         {
-		  ++input;
+          ++input;
         }
       break;
       /*-------------------------------------------------------------------*/
@@ -467,7 +480,7 @@ static struct Instruction* parseLine(const char* input, char* labelName)
             token.value = id;
             addToken(result,&token);
             state = STATE_LINE_AWAITING_FIRST_CHARACTER;
-			labelDeclaration=0;
+            labelDeclaration=0;
           }
           else
           {
@@ -483,10 +496,44 @@ static struct Instruction* parseLine(const char* input, char* labelName)
             }
             else
             {
-              if (labelDeclaration)
-                state = STATE_LINE_AWAITING_COLON;
-			  else
-			    state = STATE_LINE_AWAITING_FIRST_CHARACTER;
+              printf("Found the following label: %s\n",localString);
+              switch (findLabel(pDict,localString))
+              {
+                case 0:
+                  if (labelDeclaration)
+                  {
+                    state = STATE_LINE_AWAITING_COLON;
+                  }
+                  else
+                  {
+				    token.type = TOKEN_STRING;
+				    token.value=0;
+				    token.name = localString;
+				    addToken(result,&token);
+                    state= STATE_LINE_AWAITING_FIRST_CHARACTER;
+                  }
+                break;
+                case ERROR_INVALID_INPUT:
+                  state = STATE_LINE_ERROR;
+                break;
+                case ERROR_NOT_FOUND:
+                  printf("I suppose that %s will be here\n",localString);
+                  if (addLabel(pDict,localString,-1)==0)
+                  {
+                    token.type = TOKEN_STRING;
+				    token.value=0;
+				    token.name = localString;
+				    addToken(result,&token);
+					state = (labelDeclaration)?STATE_LINE_AWAITING_COLON:STATE_LINE_AWAITING_FIRST_CHARACTER;
+					printf("added with -1, let's sort out later\n");
+                  }
+                  else
+                  {
+                    state = STATE_LINE_ERROR;
+                  }
+                break;
+                default:break;
+              }
             }
           }
         }
@@ -536,7 +583,7 @@ static struct Instruction* parseLine(const char* input, char* labelName)
           token.name = localString;
           addToken(result,&token);
           localString[0]=0;
-		  ++input;
+          ++input;
           state=STATE_LINE_AWAITING_COMMA;
         }
         else
@@ -562,7 +609,7 @@ static struct Instruction* parseLine(const char* input, char* labelName)
             strcpy(localLabel,localString);
             strIndex=0;
             localString[0]=0;
-			++input;
+            ++input;
             state = STATE_LINE_AWAITING_FIRST_CHARACTER;
           }
           else
@@ -573,7 +620,7 @@ static struct Instruction* parseLine(const char* input, char* labelName)
         }
         else
         {
-		  ++input;
+          ++input;
         }
       break;
       /*-------------------------------------------------------------------*/
@@ -582,7 +629,7 @@ static struct Instruction* parseLine(const char* input, char* labelName)
         {
           if (c==',')
           {
-			++input;
+            ++input;
             lastWasComma=1;
             state = STATE_LINE_AWAITING_FIRST_CHARACTER;
           }
@@ -601,7 +648,7 @@ static struct Instruction* parseLine(const char* input, char* labelName)
         }
         else
         {
-		  ++input;
+          ++input;
         }
       break;
       /*-------------------------------------------------------------------*/
@@ -611,7 +658,7 @@ static struct Instruction* parseLine(const char* input, char* labelName)
       break;
       /*-------------------------------------------------------------------*/
       default:
-	    printf("ERROR: unexpected state %i in parseLine\n",state);
+        printf("ERROR: unexpected state %i in parseLine\n",state);
         state = STATE_LINE_ERROR;
       break;
     }
@@ -643,27 +690,28 @@ static int parseProgram(const char* input, struct Program* pProg, struct Diction
         instructionLine[index]=0;
         index=0;
         label[0]=0;
-        pInstr = parseLine(instructionLine,label);
+        pInstr = parseLine(instructionLine,label,pDict);
         if (pInstr==NULL)
         {
           return -1;
         }
-		if (pInstr->length>0)
-		{
+        if (strlen(label)>0)
+        {
+          printf("Label %s put in dictionary with value %i\n",label,pProg->length);
+          addLabel(pDict,label,pProg->length);
+        }
+        if (pInstr->length>0)
+        {
 		  addInstruction(pProg,pInstr);
-          if (strlen(label)>0)
-          {
-            addLabel(pDict,label,pProg->length-1);
-          }
-		}
+        }
         if (c==0)
         {
           return 0;
         }
-		else
-		{
-		  ++input;
-		}
+        else
+        {
+          ++input;
+        }
       break;
       default:
         if (index>maxLineLength-1)
@@ -680,6 +728,68 @@ static int parseProgram(const char* input, struct Program* pProg, struct Diction
     }
   }
   return -1;
+}
+
+static void printToken(struct Token* pToken)
+{
+  switch (pToken->type)
+  {
+    case TOKEN_INSTRUCTION:
+	  switch (pToken->value)
+	  {
+        case OPCODE_MOV:printf("mov ");break;
+        case OPCODE_INC:printf("inc ");break;
+        case OPCODE_DEC:printf("dec ");break;
+        case OPCODE_ADD:printf("add ");break;
+        case OPCODE_SUB:printf("sub ");break;
+        case OPCODE_MUL:printf("mul ");break;
+        case OPCODE_DIV:printf("div ");break;
+        case OPCODE_JMP:printf("jmp ");break;
+        case OPCODE_CMP:printf("cmp ");break;
+        case OPCODE_JNE:printf("jne ");break;
+        case OPCODE_JE:printf("je ");break;
+        case OPCODE_JGE:printf("jge ");break;
+        case OPCODE_JG:printf("jg ");break;
+        case OPCODE_JLE:printf("jle ");break;
+        case OPCODE_JL:printf("jl ");break;
+        case OPCODE_CALL:printf("call ");break;
+        case OPCODE_RET:printf("ret ");break;
+        case OPCODE_MSG:printf("msg ");break;
+        case OPCODE_END:printf("end ");break;
+		default:printf("<unknown opcode> ");break;
+	  }
+    break;
+    case TOKEN_REGISTER:
+	  printf("%c ",'a'+pToken->value);
+    break;
+    case TOKEN_CONSTANT:
+	  printf("%i ",pToken->value);
+    break;
+    case TOKEN_STRING:
+	  printf("%s ",pToken->name);
+    break;
+    default:printf("<unknown type> ");break;
+  }
+}
+
+
+/*-------------------------------------------------------------------------------------------------------------*/
+static void printProgram(const struct Program* pProg)
+{
+  int i,j;
+  if (pProg)
+  {
+    for (i=0;i<pProg->length;++i)
+	{
+	  printf("%i: ",i);
+	  for (j=0;j<pProg->list[i]->length;++j)
+	  {
+		printToken(&pProg->list[i]->list[j]);
+	  }
+	  printf("\n");
+	}
+	printf("\n");
+  }
 }
 
 /*-------------------------------------------------------------------------------------------------------------*/
@@ -722,6 +832,7 @@ static int unaryOperation(int opcode, struct Token* p, struct Cpu* pCpu)
       if (p->type==TOKEN_REGISTER)
       {
         pCpu->registers[p->value] += 1;
+        pCpu->counter += 1;
         return 0;
       }
     break;
@@ -729,6 +840,7 @@ static int unaryOperation(int opcode, struct Token* p, struct Cpu* pCpu)
       if (p->type==TOKEN_REGISTER)
       {
         pCpu->registers[p->value] -= 1;
+        pCpu->counter += 1;
         return 0;
       }
     break;
@@ -748,6 +860,7 @@ static int binaryOperation(int opcode, struct Token* p1, struct Token* p2, struc
         if (p2->type==TOKEN_REGISTER)
         {
           pCpu->registers[p1->value] = pCpu->registers[p2->value];
+          pCpu->counter += 1;
           return 0;
         }
         else
@@ -755,6 +868,7 @@ static int binaryOperation(int opcode, struct Token* p1, struct Token* p2, struc
           if (p2->type==TOKEN_CONSTANT)
           {
             pCpu->registers[p1->value] = p2->value;
+            pCpu->counter += 1;
             return 0;
           }
         }
@@ -766,6 +880,7 @@ static int binaryOperation(int opcode, struct Token* p1, struct Token* p2, struc
         if (p2->type==TOKEN_REGISTER)
         {
           pCpu->registers[p1->value] += pCpu->registers[p2->value];
+          pCpu->counter += 1;
           return 0;
         }
         else
@@ -773,6 +888,7 @@ static int binaryOperation(int opcode, struct Token* p1, struct Token* p2, struc
           if (p2->type==TOKEN_CONSTANT)
           {
             pCpu->registers[p1->value] += p2->value;
+            pCpu->counter += 1;
             return 0;
           }
         }
@@ -784,6 +900,7 @@ static int binaryOperation(int opcode, struct Token* p1, struct Token* p2, struc
         if (p2->type==TOKEN_REGISTER)
         {
           pCpu->registers[p1->value] -= pCpu->registers[p2->value];
+          pCpu->counter += 1;
           return 0;
         }
         else
@@ -791,6 +908,7 @@ static int binaryOperation(int opcode, struct Token* p1, struct Token* p2, struc
           if (p2->type==TOKEN_CONSTANT)
           {
             pCpu->registers[p1->value] -= p2->value;
+            pCpu->counter += 1;
             return 0;
           }
         }
@@ -802,6 +920,7 @@ static int binaryOperation(int opcode, struct Token* p1, struct Token* p2, struc
         if (p2->type==TOKEN_REGISTER)
         {
           pCpu->registers[p1->value] *= pCpu->registers[p2->value];
+          pCpu->counter += 1;
           return 0;
         }
         else
@@ -809,6 +928,7 @@ static int binaryOperation(int opcode, struct Token* p1, struct Token* p2, struc
           if (p2->type==TOKEN_CONSTANT)
           {
             pCpu->registers[p1->value] *= p2->value;
+            pCpu->counter += 1;
             return 0;
           }
         }
@@ -820,6 +940,7 @@ static int binaryOperation(int opcode, struct Token* p1, struct Token* p2, struc
         if (p2->type==TOKEN_REGISTER)
         {
           pCpu->registers[p1->value] /= pCpu->registers[p2->value];
+          pCpu->counter += 1;
           return 0;
         }
         else
@@ -827,6 +948,7 @@ static int binaryOperation(int opcode, struct Token* p1, struct Token* p2, struc
           if (p2->type==TOKEN_CONSTANT)
           {
             pCpu->registers[p1->value] /= p2->value;
+            pCpu->counter += 1;
             return 0;
           }
         }
@@ -838,6 +960,7 @@ static int binaryOperation(int opcode, struct Token* p1, struct Token* p2, struc
         if (p2->type==TOKEN_REGISTER)
         {
           pCpu->comparison = compare(pCpu->registers[p1->value],pCpu->registers[p2->value]);
+          pCpu->counter += 1;
           return 0;
         }
         else
@@ -845,6 +968,7 @@ static int binaryOperation(int opcode, struct Token* p1, struct Token* p2, struc
           if (p2->type==TOKEN_CONSTANT)
           {
             pCpu->comparison = compare(pCpu->registers[p1->value],p2->value);
+            pCpu->counter += 1;
             return 0;
           }
         }
@@ -856,6 +980,7 @@ static int binaryOperation(int opcode, struct Token* p1, struct Token* p2, struc
           if (p2->type==TOKEN_REGISTER)
           {
             pCpu->comparison = compare(p1->value,pCpu->registers[p2->value]);
+            pCpu->counter += 1;
             return 0;
           }
           else
@@ -863,6 +988,7 @@ static int binaryOperation(int opcode, struct Token* p1, struct Token* p2, struc
             if (p2->type==TOKEN_CONSTANT)
             {
               pCpu->comparison = compare(p1->value,p2->value);
+              pCpu->counter += 1;
               return 0;
             }
           }
@@ -877,6 +1003,7 @@ static int binaryOperation(int opcode, struct Token* p1, struct Token* p2, struc
 /*-------------------------------------------------------------------------------------------------------------*/
 int branchOperation(int opcode, int value, struct Cpu* pCpu, struct CallStack* pCallStack)
 {
+  printf("branchOperation(%i,%i)\n",opcode,value);
   switch (opcode)
   {
     case OPCODE_JNE:
@@ -946,9 +1073,11 @@ int branchOperation(int opcode, int value, struct Cpu* pCpu, struct CallStack* p
       push(pCallStack,pCpu->counter+1);
       pCpu->counter = value;
     break;
-    default:break;
+    default:
+	  return -1;
+	break;
   }
-  return -1;
+  return 0;
 }
 
 /*-------------------------------------------------------------------------------------------------------------*/
@@ -971,6 +1100,7 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
   int stringIndex;
   for (state=STATE_INSTR_AWAITING_OPCODE,i=0;i<pInstr->length;++i)
   {
+    printf("[%i,%i,'%s'], \n",pInstr->list[i].type,pInstr->list[i].value,pInstr->list[i].name);
     switch (state)
     {
       /*------------------------------------------------------------*/
@@ -1016,6 +1146,7 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
             break;
             /*-------------------------------------------------*/
             case OPCODE_RET:
+			  printf("Returning to pc %i\n",value);
               if (pInstr->length==1)
               {
                 value = pop(pCallStack);
@@ -1026,6 +1157,7 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
                 else
                 {
                   pCpu->counter = value;
+				  printf("Returning to pc %i\n",value);
                   state = STATE_INSTR_DONE;
                 }
               }
@@ -1036,15 +1168,15 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
             break;
             /*-------------------------------------------------*/
             case OPCODE_MSG:
-			  stringIndex=0;
+              stringIndex=0;
               state = STATE_INSTR_AWAITING_TO_PRINT;
             break;
             /*-------------------------------------------------*/
             case OPCODE_END:
               if (pInstr->length==1)
-			  {
-				state = STATE_INSTR_DONE;
-			  }
+              {
+                state = STATE_INSTR_DONE;
+              }
               else
                 state = STATE_INSTR_ERROR;
             break;
@@ -1064,7 +1196,9 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
         if (unaryOperation(opcode,&arg1,pCpu))
           state = STATE_INSTR_ERROR;
         else
+        {
           state = STATE_INSTR_DONE;
+        }
       break;
       /*------------------------------------------------------------*/
       case STATE_INSTR_AWAITING_ARG1:
@@ -1077,24 +1211,30 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
         if (binaryOperation(opcode,&arg1,&arg2,pCpu))
           state = STATE_INSTR_ERROR;
         else
+        {
           state = STATE_INSTR_DONE;
+        }
       break;
       /*------------------------------------------------------------*/
       case STATE_INSTR_AWAITING_LABEL:
         if (pInstr->list[i].type == TOKEN_STRING)
         {
-          value = getProgramCounter(pDict,pInstr->list[i].name);
-          if (value>=0)
+          printf("Calling getProgramCounter(%p,%s,value)\n",pDict,pInstr->list[i].name);
+          if (getProgramCounter(pDict,pInstr->list[i].name,&value))
           {
-            if (branchOperation(opcode,value,pCpu,pCallStack))
-              state = STATE_INSTR_ERROR;
-            else
-              state = STATE_INSTR_DONE;
+            state = STATE_INSTR_ERROR;
           }
           else
-		  {
-            state = STATE_INSTR_ERROR;
-		  }
+          {
+            printf("getProgramCounter returned %i\n",value);
+            if (value>=0)
+            {
+              if (branchOperation(opcode,value,pCpu,pCallStack))
+                state = STATE_INSTR_ERROR;
+              else
+                state = STATE_INSTR_DONE;
+            }
+          }
         }
         else
           state = STATE_INSTR_ERROR;
@@ -1104,17 +1244,19 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
         if (pInstr->list[i].type==TOKEN_STRING)
         {
           stringIndex += sprintf(&pCpu->output[stringIndex],"%s",pInstr->list[i].name);
+		  printf("Printing %s into output buffer\n",pInstr->list[i].name);
         }
         else
         {
           if (pInstr->list[i].type==TOKEN_REGISTER)
           {
             stringIndex += printf(&pCpu->output[stringIndex],"%i",pInstr->list[i].value);
+			printf("Printing %i into output buffer\n",pInstr->list[i].value);
           }
           else
           {
             printf("ERROR: unexpected token type % after msg\n",pInstr->list[i].type);
-			state = STATE_INSTR_ERROR;
+            state = STATE_INSTR_ERROR;
           }
         }
       break;
@@ -1129,15 +1271,17 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
       break;
       /*------------------------------------------------------------*/
       default:
-	    printf("ERROR: unexpected state %i in executeInstruction\n",state);
+        printf("ERROR: unexpected state %i in executeInstruction\n",state);
         return -1;
       break;
     }
   }
-  if ((state==STATE_INSTR_DONE)&&(opcode==OPCODE_END))
+  printf("\n");
+  if (state==STATE_INSTR_DONE)
   {
-    pFinished[0]=1;
-	return 0;
+    if (opcode==OPCODE_END)
+      pFinished[0]=1;
+    return 0;
   }
   return -1;
 }
@@ -1148,19 +1292,19 @@ static void deleteInstruction(struct Instruction* pInstr)
   int i;
   if (pInstr)
   {
-	if (pInstr->list)
-	{
-	  for (i=0;i<pInstr->length;++i)
-	  {
-	    if (pInstr->list[i].name)
-		{
-		  free(pInstr->list[i].name);
-		}
-	  }
-	  free(pInstr->list);
-	  pInstr->list=NULL;
-	}
-	pInstr->length=0;
+    if (pInstr->list)
+    {
+      for (i=0;i<pInstr->length;++i)
+      {
+        if (pInstr->list[i].name)
+        {
+          free(pInstr->list[i].name);
+        }
+      }
+      free(pInstr->list);
+      pInstr->list=NULL;
+    }
+    pInstr->length=0;
   }
 }
 
@@ -1170,19 +1314,37 @@ static void deleteProgram(struct Program* pProg)
   int i;
   if (pProg)
   {
-	if (pProg->list)
-	{
-	  for (i=0;i<pProg->length;++i)
-	  {
-	    if (pProg->list[i])
-		{
-		  deleteInstruction(pProg->list[i]);
-		}
-	  }
-	  free(pProg->list);
-	  pProg->list=NULL;
-	}
-	pProg->length=0;
+    if (pProg->list)
+    {
+      for (i=0;i<pProg->length;++i)
+      {
+        if (pProg->list[i])
+        {
+          deleteInstruction(pProg->list[i]);
+        }
+      }
+      free(pProg->list);
+      pProg->list=NULL;
+    }
+    pProg->length=0;
+  }
+}
+/*-------------------------------------------------------------------------------------------------------------*/
+static void printDictionary(const struct Dictionary* pDict)
+{
+  int i;
+  if (pDict)
+  {
+    if (pDict->list)
+    {
+      for (i=0;i<pDict->length;++i)
+      {
+        if (pDict->list[i].name)
+        {
+          printf("%s: %i\n",pDict->list[i].name,pDict->list[i].counter);
+        }
+      }
+    }
   }
 }
 
@@ -1192,19 +1354,19 @@ static void deleteDictionary(struct Dictionary* pDict)
   int i;
   if (pDict)
   {
-	if (pDict->list)
-	{
-	  for (i=0;i<pDict->length;++i)
-	  {
-	    if (pDict->list[i].name)
-		{
-		  free(pDict->list[i].name);
-		}
-	  }
-	  free(pDict->list);
-	  pDict->list=NULL;
-	}
-	pDict->length=0;
+    if (pDict->list)
+    {
+      for (i=0;i<pDict->length;++i)
+      {
+        if (pDict->list[i].name)
+        {
+          free(pDict->list[i].name);
+        }
+      }
+      free(pDict->list);
+      pDict->list=NULL;
+    }
+    pDict->length=0;
   }
 }
 
@@ -1220,24 +1382,30 @@ static char* executeProgram(struct Program* pProg, struct Dictionary* pDict)
   if (result==NULL)
   {
     printf("ERROR: malloc in executeProgram\n");
-	return (char*)(-1);
+    return (char*)(-1);
   }
   memset(result,0,outStringSize);
-  for (finished=0;finished==0;)
+  printf("---------------------- Program preview -------------------------\n");
+  printProgram(pProg);
+  printf("------- Routine table --------\n");
+  printDictionary(pDict);
+  printf("----------------------------------------------------------------\n");
+  for (finished=1;finished==0;)
   {
+    printf("********************************************************\n");
     printf("Executing instruction at program counter %i\n",cpu.counter);
     pInstr = pProg->list[cpu.counter];
     if (pInstr==NULL)
     {
       printf("ERROR: null instruction\n");
-	  free(result);
-	  return (char*)(-1);
+      free(result);
+      return (char*)(-1);
     }
     if (executeInstruction(pInstr,pDict,&cpu,&callStack,&finished))
     {
       printf("ERROR: malformed instruction\n");
-	  free(result);
-	  return (char*)(-1);
+      free(result);
+      return (char*)(-1);
     }
   }
   strcpy(result,&cpu.output[0]);
@@ -1282,7 +1450,7 @@ int main(int argc, char* argv[])
   else
   {
     printf("Program output: %s\n",result);
-	free(result);
+    free(result);
   }
   return 0;
 }
