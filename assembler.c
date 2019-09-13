@@ -387,16 +387,14 @@ static struct Instruction* parseLine(const char* input, char* labelName, struct 
     return result;
   }
   localLabel[0]=0;
-  printf("--------------------------------------------------------------------\n");
   for (labelDeclaration=1,lastWasComma=0,strIndex=0,state=STATE_LINE_AWAITING_FIRST_CHARACTER;;)
   {
     c = input[0];
-    printf("Processing character %c in state %i\n",c,state);
     switch (state)
     {
       /*-------------------------------------------------------------------*/
       case STATE_LINE_AWAITING_FIRST_CHARACTER:
-        if (c!=' ')
+        if ((c!=' ')&&(c!='\t'))
         {
           if ((c==0)||(c==';'))
           {
@@ -496,11 +494,10 @@ static struct Instruction* parseLine(const char* input, char* labelName, struct 
             }
             else
             {
-              printf("Found the following label: %s\n",localString);
               switch (findLabel(pDict,localString))
               {
                 case 0:
-				  printf("Case 0\n");
+                  
                   if (labelDeclaration)
                   {
                     state = STATE_LINE_AWAITING_COLON;
@@ -515,27 +512,24 @@ static struct Instruction* parseLine(const char* input, char* labelName, struct 
                   }
                 break;
                 case ERROR_INVALID_INPUT:
-				  printf("Case ERROR_INVALID_INPUT\n");
+                  
                   state = STATE_LINE_ERROR;
                 break;
                 case ERROR_NOT_FOUND:
-				  printf("Case ERROR_NOT_FOUND\n");
-                  printf("I suppose that %s will be here\n",localString);
                   if (addLabel(pDict,localString,-1)==0)
                   {
-				    if (labelDeclaration)
-				    {
-				      state = STATE_LINE_AWAITING_COLON;
-				    }
-				    else
-				    {
-				      token.type = TOKEN_STRING;
+                    if (labelDeclaration)
+                    {
+                      state = STATE_LINE_AWAITING_COLON;
+                    }
+                    else
+                    {
+                      token.type = TOKEN_STRING;
                       token.value=0;
                       token.name = localString;
                       addToken(result,&token);
-					  state = STATE_LINE_AWAITING_FIRST_CHARACTER;
-				    }
-                    printf("added with -1, let's sort out later\n");
+                      state = STATE_LINE_AWAITING_FIRST_CHARACTER;
+                    }
                   }
                   else
                   {
@@ -543,19 +537,19 @@ static struct Instruction* parseLine(const char* input, char* labelName, struct 
                   }
                 break;
                 default:
-				  if (labelDeclaration)
-				  {
-				    state = STATE_LINE_AWAITING_COLON;
-				  }
-				  else
-				  {
-				    token.type = TOKEN_STRING;
+                  if (labelDeclaration)
+                  {
+                    state = STATE_LINE_AWAITING_COLON;
+                  }
+                  else
+                  {
+                    token.type = TOKEN_STRING;
                     token.value=0;
                     token.name = localString;
                     addToken(result,&token);
-					state = STATE_LINE_AWAITING_FIRST_CHARACTER;
-				  }
-				break;
+                    state = STATE_LINE_AWAITING_FIRST_CHARACTER;
+                  }
+                break;
               }
             }
           }
@@ -625,7 +619,7 @@ static struct Instruction* parseLine(const char* input, char* labelName, struct 
       break;
       /*-------------------------------------------------------------------*/
       case STATE_LINE_AWAITING_COLON:
-        if (c!=' ')
+        if ((c!=' ')&&(c!='\t'))
         {
           if (c==':')
           {
@@ -648,7 +642,7 @@ static struct Instruction* parseLine(const char* input, char* labelName, struct 
       break;
       /*-------------------------------------------------------------------*/
       case STATE_LINE_AWAITING_COMMA:
-        if (c!=' ')
+        if ((c!=' ')&&(c!='\t'))
         {
           if (c==',')
           {
@@ -720,7 +714,6 @@ static int parseProgram(const char* input, struct Program* pProg, struct Diction
         }
         if (strlen(label)>0)
         {
-          printf("Label %s put in dictionary with value %i\n",label,pProg->length);
           addLabel(pDict,label,pProg->length);
         }
         if (pInstr->length>0)
@@ -993,7 +986,6 @@ static int binaryOperation(int opcode, struct Token* p1, struct Token* p2, struc
           if (p2->type==TOKEN_CONSTANT)
           {
             pCpu->comparison = compare(pCpu->registers[p1->value],p2->value);
-			printf("comparing %i with %i\n",pCpu->registers[p1->value],p2->value);
             pCpu->counter += 1;
             return 0;
           }
@@ -1029,7 +1021,6 @@ static int binaryOperation(int opcode, struct Token* p1, struct Token* p2, struc
 /*-------------------------------------------------------------------------------------------------------------*/
 int branchOperation(int opcode, int value, struct Cpu* pCpu, struct CallStack* pCallStack)
 {
-  printf("branchOperation(%i,%i)\n",opcode,value);
   switch (opcode)
   {
     case OPCODE_JNE:
@@ -1097,7 +1088,6 @@ int branchOperation(int opcode, int value, struct Cpu* pCpu, struct CallStack* p
     break;
     case OPCODE_CALL:
       push(pCallStack,pCpu->counter+1);
-      printf("Pushed %i\n",pCpu->counter+1);
       pCpu->counter = value;
     break;
     default:
@@ -1127,7 +1117,6 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
   int stringIndex;
   for (state=STATE_INSTR_AWAITING_OPCODE,i=0;i<pInstr->length;++i)
   {
-    printf("[%i,%i,'%s'], \n",pInstr->list[i].type,pInstr->list[i].value,pInstr->list[i].name);
     switch (state)
     {
       /*------------------------------------------------------------*/
@@ -1183,7 +1172,6 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
                 else
                 {
                   pCpu->counter = value;
-                  printf("Returning to pc %i\n",value);
                   state = STATE_INSTR_DONE;
                 }
               }
@@ -1246,14 +1234,12 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
       case STATE_INSTR_AWAITING_LABEL:
         if (pInstr->list[i].type == TOKEN_STRING)
         {
-          printf("Calling getProgramCounter(%p,%s,value)\n",pDict,pInstr->list[i].name);
           if (getProgramCounter(pDict,pInstr->list[i].name,&value))
           {
             state = STATE_INSTR_ERROR;
           }
           else
           {
-            printf("getProgramCounter returned %i\n",value);
             if (value>=0)
             {
               if (branchOperation(opcode,value,pCpu,pCallStack))
@@ -1271,7 +1257,6 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
         if (pInstr->list[i].type==TOKEN_STRING)
         {
           stringIndex += sprintf(&pCpu->output[stringIndex],"%s",pInstr->list[i].name);
-          printf("Printing %s into output buffer\n",pInstr->list[i].name);
           if (i==pInstr->length-1)
             state = STATE_INSTR_DONE;
         }
@@ -1280,7 +1265,6 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
           if (pInstr->list[i].type==TOKEN_REGISTER)
           {
             stringIndex += sprintf(&pCpu->output[stringIndex],"%i",pCpu->registers[pInstr->list[i].value]);
-            printf("Printing %i into output buffer\n",pCpu->registers[pInstr->list[i].value]);
             if (i==pInstr->length-1)
               state = STATE_INSTR_DONE;
           }
@@ -1307,7 +1291,6 @@ static int executeInstruction(struct Instruction* pInstr, struct Dictionary* pDi
       break;
     }
   }
-  printf("\n");
   if (state==STATE_INSTR_DONE)
   {
     if (opcode==OPCODE_END)
@@ -1416,20 +1399,13 @@ static char* executeProgram(struct Program* pProg, struct Dictionary* pDict)
     return (char*)(-1);
   }
   memset(result,0,outStringSize);
-  printf("---------------------- Program preview -------------------------\n");
-  printProgram(pProg);
-  printf("------- Routine table --------\n");
-  printDictionary(pDict);
-  printf("----------------------------------------------------------------\n");
   for (finished=0;finished==0;)
   {
-    printf("********************************************************\n");
-    printf("Executing instruction at program counter %i\n",cpu.counter);
-	if (cpu.counter>=pProg->length)
-	{
-	  printf("ERROR: program incorrect termination\n");
-	  return (char*)(-1);
-	}
+    if (cpu.counter>=pProg->length)
+    {
+      printf("ERROR: program incorrect termination\n");
+      return (char*)(-1);
+    }
     pInstr = pProg->list[cpu.counter];
     if (pInstr==NULL)
     {
@@ -1467,133 +1443,27 @@ char* assembler_interpreter(const char* input)
 /*-------------------------------------------------------------------------------------------------------------*/
 int main(int argc, char* argv[])
 {
-#define NUM_PROGS 5
-  const char myProgram1[] = "; My first program\n"
-                    "mov  a, 5\n"
-                    "inc  a\n"
-                    "call function\n"
-                    "msg  '(5+1)/2 = ', a    ; output message\n"
-                    "end\n"
-                    "\n"
-                    "function:\n"
-                    "    div  a, 2\n"
-                    "    ret\n";
-                    
-  const char myProgram2[]="mov   a, 5\n"
-                          "mov   b, a\n"
-                          "mov   c, a\n"
-                          "call  proc_fact\n"
-                          "call  print\n"
-                          "end\n"
-                          "\n"
-                          "proc_fact:\n"
-                          "    dec   b\n"
-                          "    mul   c, b\n"
-                          "    cmp   b, 1\n"
-                          "    jne   proc_fact\n"
-                          "    ret\n"
-                          "\n"
-                          "print:\n"
-                          "    msg   a, '! = ', c ; output text\n"
-                          "    ret\n";
-  const char myProgram3[]=
-                          "mov   a, 8            ; value\n"
-                          "mov   b, 0            ; next\n"
-                          "mov   c, 0            ; counter\n"
-                          "mov   d, 0            ; first\n"
-                          "mov   e, 1            ; second\n"
-                          "call  proc_fib\n"
-                          "call  print\n"
-                          "end\n"
-                          "\n"
-                          "proc_fib:\n"
-                          "    cmp   c, 2\n"
-                          "    jl    func_0\n"
-                          "    mov   b, d\n"
-                          "    add   b, e\n"
-                          "    mov   d, e\n"
-                          "    mov   e, b\n"
-                          "    inc   c\n"
-                          "    cmp   c, a\n"
-                          "    jle   proc_fib\n"
-                          "    ret\n"
-                          "\n"
-                          "func_0:\n"
-                          "    mov   b, c\n"
-                          "    inc   c\n"
-                          "    jmp   proc_fib\n"
-                          "\n"
-                          "print:\n"
-                          "    msg   'Term ', a, ' of Fibonacci series is: ', b        ; output text\n"
-                          "    ret\n";
-
-
-const char myProgram4[]=
-"mov   a, 81         ; value1\n"
-"mov   b, 153        ; value2\n"
-"call  init\n"
-"call  proc_gcd\n"
-"call  print\n"
-"end\n"
-"\n"
-"proc_gcd:\n"
-"    cmp   c, d\n"
-"    jne   loop\n"
-"    ret\n"
-"\n"
-"loop:\n"
-"    cmp   c, d\n"
-"    jg    a_bigger\n"
-"    jmp   b_bigger\n"
-"\n"
-"a_bigger:\n"
-"    sub   c, d\n"
-"    jmp   proc_gcd\n"
-"\n"
-"b_bigger:\n"
-"    sub   d, c\n"
-"    jmp   proc_gcd\n"
-"\n"
-"init:\n"
-"    cmp   a, 0\n"
-"    jl    a_abs\n"
-"    cmp   b, 0\n"
-"    jl    b_abs\n"
-"    mov   c, a            ; temp1\n"
-"    mov   d, b            ; temp2\n"
-"    ret\n"
-"\n"
-"a_abs:\n"
-"    mul   a, -1\n"
-"    jmp   init\n"
-"\n"
-"b_abs:\n"
-"    mul   b, -1\n"
-"    jmp   init\n"
-"\n"
-"print:\n"
-"    msg   'gcd(', a, ', ', b, ') = ', c\n"
-"    ret\n";
-
-const char myProgram5[]=
-"call  func1\n"
-"call  print\n"
-"end\n"
-"\n"
-"func1:\n"
-"    call  func2\n"
-"    ret\n"
-"\n"
-"func2:\n"
-"    ret\n"
-"\n"
-"print:\n"
-"    msg 'This program should return -1'\n";
+#define NUM_PROGS 1
+  const char myProgram1[] = "mov z, 10   ; instruction mov z, 10\n"
+                            "mov k, 8   ; instruction mov k, 8\n"
+                            "call func\n"
+                            "msg 'Random result: ', y\n"
+                            "end\n"
+                            "\n"
+                            "func:\n"
+                            "   cmp z, k\n"
+                            "   je exit\n"
+                            "   mov y, z\n"
+                            "   sub y, k\n"
+                            "   ret\n"
+                            "; Do nothing\n"
+                            "exit:\n"
+                            "   msg 'Do nothing'\n";
 
   int i;
 
   char* result;
-  const char* prArray[NUM_PROGS] = {myProgram1,myProgram2,myProgram3,myProgram4,myProgram5};
+  const char* prArray[NUM_PROGS] = {myProgram1};
   
   for (i=0;i<NUM_PROGS;++i)
   {
