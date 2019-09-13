@@ -523,11 +523,18 @@ static struct Instruction* parseLine(const char* input, char* labelName, struct 
                   printf("I suppose that %s will be here\n",localString);
                   if (addLabel(pDict,localString,-1)==0)
                   {
-                    token.type = TOKEN_STRING;
-                    token.value=0;
-                    token.name = localString;
-                    addToken(result,&token);
-                    state = (labelDeclaration)?STATE_LINE_AWAITING_COLON:STATE_LINE_AWAITING_FIRST_CHARACTER;
+				    if (labelDeclaration)
+				    {
+				      state = STATE_LINE_AWAITING_COLON;
+				    }
+				    else
+				    {
+				      token.type = TOKEN_STRING;
+                      token.value=0;
+                      token.name = localString;
+                      addToken(result,&token);
+					  state = STATE_LINE_AWAITING_FIRST_CHARACTER;
+				    }
                     printf("added with -1, let's sort out later\n");
                   }
                   else
@@ -536,7 +543,18 @@ static struct Instruction* parseLine(const char* input, char* labelName, struct 
                   }
                 break;
                 default:
-				  state = STATE_LINE_AWAITING_COLON;
+				  if (labelDeclaration)
+				  {
+				    state = STATE_LINE_AWAITING_COLON;
+				  }
+				  else
+				  {
+				    token.type = TOKEN_STRING;
+                    token.value=0;
+                    token.name = localString;
+                    addToken(result,&token);
+					state = STATE_LINE_AWAITING_FIRST_CHARACTER;
+				  }
 				break;
               }
             }
@@ -1391,7 +1409,6 @@ static char* executeProgram(struct Program* pProg, struct Dictionary* pDict)
   struct Instruction* pInstr;
   static const size_t outStringSize = OUTPUT_STRING_SIZE * sizeof(char);
   int finished;
-  int i;
   char* result = (char*)malloc(outStringSize);
   if (result==NULL)
   {
@@ -1404,10 +1421,15 @@ static char* executeProgram(struct Program* pProg, struct Dictionary* pDict)
   printf("------- Routine table --------\n");
   printDictionary(pDict);
   printf("----------------------------------------------------------------\n");
-  for (i=0,finished=0;(finished==0)&&(i<1000);++i)
+  for (finished=0;finished==0;)
   {
     printf("********************************************************\n");
     printf("Executing instruction at program counter %i\n",cpu.counter);
+	if (cpu.counter>=pProg->length)
+	{
+	  printf("ERROR: program incorrect termination\n");
+	  return (char*)(-1);
+	}
     pInstr = pProg->list[cpu.counter];
     if (pInstr==NULL)
     {
@@ -1422,8 +1444,6 @@ static char* executeProgram(struct Program* pProg, struct Dictionary* pDict)
       return (char*)(-1);
     }
   }
-  if (finished==0)
-    printf("WARNING: executions stopped because of loop issues\n");
   strcpy(result,&cpu.output[0]);
   return result;
 }
@@ -1447,7 +1467,7 @@ char* assembler_interpreter(const char* input)
 /*-------------------------------------------------------------------------------------------------------------*/
 int main(int argc, char* argv[])
 {
-#define NUM_PROGS 4
+#define NUM_PROGS 5
   const char myProgram1[] = "; My first program\n"
                     "mov  a, 5\n"
                     "inc  a\n"
@@ -1553,13 +1573,27 @@ const char myProgram4[]=
 "\n"
 "print:\n"
 "    msg   'gcd(', a, ', ', b, ') = ', c\n"
-"    ret\n"
+"    ret\n";
 
+const char myProgram5[]=
+"call  func1\n"
+"call  print\n"
+"end\n"
+"\n"
+"func1:\n"
+"    call  func2\n"
+"    ret\n"
+"\n"
+"func2:\n"
+"    ret\n"
+"\n"
+"print:\n"
+"    msg 'This program should return -1'\n";
 
   int i;
 
   char* result;
-  const char* prArray[NUM_PROGS] = {myProgram1,myProgram2,myProgram3,myProgram4};
+  const char* prArray[NUM_PROGS] = {myProgram1,myProgram2,myProgram3,myProgram4,myProgram5};
   
   for (i=0;i<NUM_PROGS;++i)
   {
