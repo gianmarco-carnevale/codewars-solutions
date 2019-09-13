@@ -1404,7 +1404,7 @@ static char* executeProgram(struct Program* pProg, struct Dictionary* pDict)
   printf("------- Routine table --------\n");
   printDictionary(pDict);
   printf("----------------------------------------------------------------\n");
-  for (i=0,finished=0;(finished==0)&&(i<200);++i)
+  for (i=0,finished=0;(finished==0)&&(i<1000);++i)
   {
     printf("********************************************************\n");
     printf("Executing instruction at program counter %i\n",cpu.counter);
@@ -1423,7 +1423,7 @@ static char* executeProgram(struct Program* pProg, struct Dictionary* pDict)
     }
   }
   if (finished==0)
-    printf("WARNING: executions stopped because of loop\n");
+    printf("WARNING: executions stopped because of loop issues\n");
   strcpy(result,&cpu.output[0]);
   return result;
 }
@@ -1447,7 +1447,7 @@ char* assembler_interpreter(const char* input)
 /*-------------------------------------------------------------------------------------------------------------*/
 int main(int argc, char* argv[])
 {
-#define NUM_PROGS 3
+#define NUM_PROGS 4
   const char myProgram1[] = "; My first program\n"
                     "mov  a, 5\n"
                     "inc  a\n"
@@ -1506,11 +1506,60 @@ int main(int argc, char* argv[])
                           "print:\n"
                           "    msg   'Term ', a, ' of Fibonacci series is: ', b        ; output text\n"
                           "    ret\n";
-	
+
+
+const char myProgram4[]=
+"mov   a, 81         ; value1\n"
+"mov   b, 153        ; value2\n"
+"call  init\n"
+"call  proc_gcd\n"
+"call  print\n"
+"end\n"
+"\n"
+"proc_gcd:\n"
+"    cmp   c, d\n"
+"    jne   loop\n"
+"    ret\n"
+"\n"
+"loop:\n"
+"    cmp   c, d\n"
+"    jg    a_bigger\n"
+"    jmp   b_bigger\n"
+"\n"
+"a_bigger:\n"
+"    sub   c, d\n"
+"    jmp   proc_gcd\n"
+"\n"
+"b_bigger:\n"
+"    sub   d, c\n"
+"    jmp   proc_gcd\n"
+"\n"
+"init:\n"
+"    cmp   a, 0\n"
+"    jl    a_abs\n"
+"    cmp   b, 0\n"
+"    jl    b_abs\n"
+"    mov   c, a            ; temp1\n"
+"    mov   d, b            ; temp2\n"
+"    ret\n"
+"\n"
+"a_abs:\n"
+"    mul   a, -1\n"
+"    jmp   init\n"
+"\n"
+"b_abs:\n"
+"    mul   b, -1\n"
+"    jmp   init\n"
+"\n"
+"print:\n"
+"    msg   'gcd(', a, ', ', b, ') = ', c\n"
+"    ret\n"
+
+
   int i;
 
   char* result;
-  const char* prArray[NUM_PROGS] = {myProgram1,myProgram2,myProgram3};
+  const char* prArray[NUM_PROGS] = {myProgram1,myProgram2,myProgram3,myProgram4};
   
   for (i=0;i<NUM_PROGS;++i)
   {
