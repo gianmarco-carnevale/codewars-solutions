@@ -126,19 +126,41 @@ static uint64_t getBitResetMask(int value)
   }
 }
 
+static uint64_t getFilterMask(int column)
+{
+  switch (column)
+  {
+    case 0:  return (uint64_t)0xFF000000000000ULL;
+    case 1:  return (uint64_t)0x00FF0000000000ULL;
+    case 2:  return (uint64_t)0x0000FF00000000ULL;
+    case 3:  return (uint64_t)0x000000FF000000ULL;
+    case 4:  return (uint64_t)0x00000000FF0000ULL;
+    case 5:  return (uint64_t)0x0000000000FF00ULL;
+    case 6:  return (uint64_t)0x000000000000FFULL;
+    default:
+      printf("ERROR: invalid value %i in getFilterMask\n",column);
+      return 0;
+  }
+}
+static void printSquare(struct Square *, int* );
 static int setValue(struct Square *p, unsigned int value, int row, int column)
 {
   int i;
+  uint64_t rowMask;
   uint64_t setMask, resetMask;
   setMask   = ((uint64_t)(1 << (value-1))) << SHIFT_AMOUNT_BY_COLUMN(column);
   resetMask  = getValueResetRowMask(column);
   resetMask |= getBitResetMask(value) << SHIFT_AMOUNT_BY_COLUMN(column);
-  if (p->rows[row] & setMask)
+  rowMask = p->rows[row] & getFilterMask(column);
+  if (rowMask & setMask)
   {
-    p->rows[row] &= getBitResetRowMask(value);/* block the value along all the row */
+    /*if (rowMask != setMask)*/
+
+	
+	p->rows[row] &= getBitResetRowMask(value);/* block the value along all the row */
     p->rows[row] &= getValueResetRowMask(column);/* wipe out the column value  */
     p->rows[row] |= setMask;/* set the value for that column */
-    
+
     for (i=0;i<7;++i)
     {
       if (i!=row)
@@ -148,7 +170,7 @@ static int setValue(struct Square *p, unsigned int value, int row, int column)
     }
     return 0;
   }
-  printf("ERROR: cannot set value %d at position [%i][%i], see row: %llX\n",value,row,column,p->rows[row]);
+  /*printf("ERROR: cannot set value %d at position [%i][%i]\n",value,row,column);*/
   return -1;
 }
 
@@ -164,7 +186,7 @@ static void setClueByRow(struct Square* p, int clue, int row, int reversed)
       case 5: p->rows[row] &= (uint64_t)0x7F7F7F3F1F0F07ULL; break;
       case 6: p->rows[row] &= (uint64_t)0x7F7F3F1F0F0703ULL; break;
       default:
-        printf("ERROR: unexpected clue %i in setClueByRow(r)\n",clue);
+        printf("ERROR: unexpected clue %i in setClueByRow(reversed)\n",clue);
         break;
     }
   }
@@ -493,7 +515,9 @@ static void setClue(struct Square* p, int clue, int index, int isRow, int revers
 {
   switch (clue)
   {
-    case 1:
+	case 0:
+	  return;
+	case 1:
       if (isRow)
       {
         setClue1ByRow(p,index,reverse);
@@ -527,45 +551,25 @@ static void setClue(struct Square* p, int clue, int index, int isRow, int revers
         setClue7ByColumn(p,index,reverse);
       }
     break;
-    default:break;
+    default:
+	  printf("ERROR: setting clue %i for %i,%i,%i\n",clue,index,isRow,reverse);
+	break;
   }
 }
 
-static void printSquare(struct Square *, int* );
+
 
 void setClueArray(struct Square* p, int* array)
 {
   int i;
   for (i=0;i<7;++i)
   {
-    if (array[i]>0)
-    {
-      setClue(p,array[i],i,0,0);
-    }
-  }
-  for (i=7;i<14;++i)
-  {
-    if (array[i]>0)
-    {
-      setClue(p,array[i],i-7,1,1);
-    }
-  }
-  for (i=14;i<21;++i)
-  {
-    if (array[i]>0)
-    {
-      setClue(p,array[i],20-i,0,1);
-    }
-  }
-  for (i=21;i<28;++i)
-  {
-    if (array[i]>0)
-    {
-      setClue(p,array[i],27-i,1,0);
-    }
+    setClue(p,array[i],     i,0,0);
+	setClue(p,array[i+7],   i,1,1);
+	setClue(p,array[i+14],6-i,0,1);
+	setClue(p,array[i+21],6-i,1,0);
   }
 }
-
 
 static void initialize(struct Square* p)
 {
@@ -820,7 +824,7 @@ static int getCandidates(unsigned int value, unsigned int *array)
     return 0;
   for (count=0,i=6;i>=0;--i)
   {
-    if (value & (1<<i))
+    if (value & (1U<<i))
     {
       array[count++]=i+1;
     }
@@ -836,7 +840,6 @@ static int recursiveSolve(struct Square* p, int* clues)
   struct Square newSquare;
   unsigned int candidates[7]={0,0,0,0,0,0,0};
   unsigned int tempArray[7]={0,0,0,0,0,0,0};
-  unsigned int checkStats[7]={0,0,0,0,0,0,0};
   finalValues=0;
   minCount=8;
   for (r=0;r<7;++r)
@@ -864,21 +867,13 @@ static int recursiveSolve(struct Square* p, int* clues)
       }
       else
       {
-	    ++checkStats[tempArray[0]-1];
-		++finalValues;
+		if (setValue(p,tempArray[0],r,c)==0)
+		  ++finalValues;
 	  }
     }
   }
   if (finalValues==49)
   {
-    for (k=0;k<7;++k)
-    {
-	  if (checkStats[k]!=7)
-	  {
-	    
-		return -1;
-	  }
-	}	
 	if (checkClueArray(p,clues))
     {
       return -1;
@@ -907,6 +902,48 @@ static int recursiveSolve(struct Square* p, int* clues)
 }
 
 
+
+
+static int getFinalValue(unsigned int value)
+{
+  switch (value)
+  {
+    case 1: return 1;
+	case 2: return 2;
+	case 4: return 3;
+	case 8: return 4;
+	case 16: return 5;
+	case 32: return 6;
+	case 64: return 7;
+	default: return 0;
+  }
+}
+
+static int** packResult(struct Square* p)
+{
+  int** result=NULL;
+  int i,j;
+  if (p)
+  {
+    result = (int**)malloc(7*sizeof(int*));
+	if (result)
+	{
+	  for (i=0;i<7;++i)
+	  {
+	    result[i] = (int*)malloc(7*sizeof(int));
+		if (result[i])
+		{
+		  for (j=0;j<7;++j)
+		  {
+		    result[i][j] = getFinalValue(getCell(p,i,j));
+		  }
+		}
+	  }
+	}
+  }
+  return result;
+}
+
 int** SolvePuzzle(int* clues)
 {
     
@@ -917,6 +954,7 @@ int** SolvePuzzle(int* clues)
     if (recursiveSolve(&square,clues)==0)
     {
       printSquare(&square,clues);
+	  return packResult(&square);
     }
     else
     {
@@ -925,34 +963,9 @@ int** SolvePuzzle(int* clues)
     return NULL;
 }
 
-static uint64_t xorAnd(struct Square* p)
-{
-  int i;
-  uint64_t result = /*0x7F7F7F7F7F7F7FULL*/0;
-  for (i=0;i<7;++i)
-  {
-    result = result ^ p->rows[i];
-  }
-  return result;
-}
-
-/*
-static uint64_t columnAnd(struct Square* p)
-{
-  int i;
-  uint64_t result = 0x7F7F7F7F7F7F7FULL;
-  for (i=0;i<7;++i)
-  {
-    result = result & p->rows[i];
-  }
-  return result;
-}
-*/
-
-
 int main(int argc, char* argv[])
 {
-    struct Square s = {0x01102040080402ULL,
+    struct Square s = {0x03102040080402ULL,
                        0x02400810040120ULL,
                        0x04081020400201ULL,
                        0x08200401024010ULL,
@@ -980,13 +993,44 @@ int main(int argc, char* argv[])
     
     */
 #if 0
+
     initialize(&s);
-    setClueArray(&s,clues);
-    printSquare(&s,NULL);
-    setValue(&s,7,1,1);
-    setValue(&s,7,3,5);
-    setValue(&s,7,0,3);
-    setValue(&s,1,0,6);
+	printSquare(&s,NULL);
+	/*
+    setValue(&s,1,0,0);
+	setValue(&s,5,0,1);
+	setValue(&s,6,0,2);
+	setValue(&s,7,0,3);
+	setValue(&s,4,0,4);
+	setValue(&s,3,0,5);
+	setValue(&s,2,0,6);
+
+    setValue(&s,2,1,0);
+	setValue(&s,7,1,1);
+	setValue(&s,4,1,2);
+	setValue(&s,5,1,3);
+	setValue(&s,3,1,4);
+	setValue(&s,1,1,5);
+	setValue(&s,6,1,6);
+
+    setValue(&s,3,2,0);
+	setValue(&s,4,2,1);
+	setValue(&s,5,2,2);
+	setValue(&s,6,2,3);
+	setValue(&s,7,2,4);
+	setValue(&s,2,2,5);
+	setValue(&s,1,2,6);
+	
+    setValue(&s,4,3,0);
+	setValue(&s,6,3,1);
+	setValue(&s,3,3,2);
+	setValue(&s,1,3,3);
+	setValue(&s,2,3,4);
+	setValue(&s,7,3,5);
+	setValue(&s,5,3,6);
+	*/
+	setValue(&s,1,6,3);
+	
     printSquare(&s,NULL);
 #else
     
