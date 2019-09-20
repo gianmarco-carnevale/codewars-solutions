@@ -155,9 +155,7 @@ static int setValue(struct Square *p, unsigned int value, int row, int column)
   if (rowMask & setMask)
   {
     /*if (rowMask != setMask)*/
-
-	
-	p->rows[row] &= getBitResetRowMask(value);/* block the value along all the row */
+    p->rows[row] &= getBitResetRowMask(value);/* block the value along all the row */
     p->rows[row] &= getValueResetRowMask(column);/* wipe out the column value  */
     p->rows[row] |= setMask;/* set the value for that column */
 
@@ -515,9 +513,9 @@ static void setClue(struct Square* p, int clue, int index, int isRow, int revers
 {
   switch (clue)
   {
-	case 0:
-	  return;
-	case 1:
+    case 0:
+      return;
+    case 1:
       if (isRow)
       {
         setClue1ByRow(p,index,reverse);
@@ -552,8 +550,8 @@ static void setClue(struct Square* p, int clue, int index, int isRow, int revers
       }
     break;
     default:
-	  printf("ERROR: setting clue %i for %i,%i,%i\n",clue,index,isRow,reverse);
-	break;
+      printf("ERROR: setting clue %i for %i,%i,%i\n",clue,index,isRow,reverse);
+    break;
   }
 }
 
@@ -565,9 +563,9 @@ void setClueArray(struct Square* p, int* array)
   for (i=0;i<7;++i)
   {
     setClue(p,array[i],     i,0,0);
-	setClue(p,array[i+7],   i,1,1);
-	setClue(p,array[i+14],6-i,0,1);
-	setClue(p,array[i+21],6-i,1,0);
+    setClue(p,array[i+7],   i,1,1);
+    setClue(p,array[i+14],6-i,0,1);
+    setClue(p,array[i+21],6-i,1,0);
   }
 }
 
@@ -769,10 +767,11 @@ static char getClue(int* clueArray, int pos)
     return ('0' + clueArray[pos]);
   return ' ';
 }
-
+static void getArrayFromRow(struct Square* , int , unsigned int *);
 static void printSquare(struct Square *p, int* clueArray)
 {
   int column, row;
+  unsigned int squareRow[7];
   printf("\n     ");
   for (column=0;column<7;++column)
   {
@@ -786,6 +785,7 @@ static void printSquare(struct Square *p, int* clueArray)
   printf("-+\n");
   for (row=0;row<7;++row)
   {
+    getArrayFromRow(p,row,squareRow);
     if (row>0)
     {
       printf("  | ");
@@ -798,7 +798,7 @@ static void printSquare(struct Square *p, int* clueArray)
     printf("%c |",getClue(clueArray,4*7-1-row));
     for (column=0;column<7;++column)
     {
-      printValue(getCell(p,row,column));
+      printValue(squareRow[column]);
     }
     printf(" | %c\n",getClue(clueArray,7+row));
   }
@@ -820,61 +820,102 @@ static void printSquare(struct Square *p, int* clueArray)
 static int getCandidates(unsigned int value, unsigned int *array)
 {
   int i, count;
-  if (value==0)
-    return 0;
-  for (count=0,i=6;i>=0;--i)
+  unsigned int mask;
+  switch (value)
   {
-    if (value & (1U<<i))
-    {
-      array[count++]=i+1;
-    }
+    case 0: return 0;
+	case 0x01:
+    case 0x02:
+    case 0x04:
+    case 0x08:
+    case 0x10:
+    case 0x20:
+    case 0x40:
+	  return 1;
+    default:
+	  for (mask=0x40,count=0,i=0;i<7;++i,mask>>=1)
+      {
+        if (value & mask)
+        {
+          array[count]=7-i;
+          ++count;
+        }
+      }
+      return count;
   }
-  return count;
 }
 
 
+static void getArrayFromRow(struct Square* p, int r, unsigned int *array)
+{
+  int i;
+  uint64_t value;
+  unsigned int shiftAmount;
+  for (i=0;i<7;++i)
+  {
+    shiftAmount = (6-i)*8;
+    value = p->rows[r] & ((uint64_t)0x7FULL << shiftAmount);
+    array[i] = (value>>shiftAmount)&0x7FULL;
+  }
+}
+static int getFinalValue(unsigned int );
 static int recursiveSolve(struct Square* p, int* clues)
 {
   int bestRow, bestColumn, r, c, n, finalValues, k;
-  unsigned int minCount, temp;
+  unsigned int minCount;
   struct Square newSquare;
   unsigned int candidates[7]={0,0,0,0,0,0,0};
   unsigned int tempArray[7]={0,0,0,0,0,0,0};
+  unsigned int tempRow[7]={0,0,0,0,0,0,0};
   finalValues=0;
-  minCount=8;
+  minCount=7;
+  bestRow=0;
+  bestColumn=0;
+
   for (r=0;r<7;++r)
   {
+    getArrayFromRow(p,r,tempRow);
     for (c=0;c<7;++c)
     {
-      temp = getCell(p,r,c);
-	  n = getCandidates(temp,tempArray);
-      if (n<=0)
-	  {
-	    return -1;
-	  }
-      if (n>1)
+      n = getCandidates(tempRow[c],tempArray);
+      switch (n)
       {
-        if (n<minCount)
-        {
-          minCount=n;
-          bestRow=r;
-          bestColumn=c;
-          for (k=0;k<7;++k)
+        case 0:
+          return -1;
+        break;
+        case 1:
+          if (setValue(p,getFinalValue(tempRow[c]),r,c)==0)
           {
-            candidates[k] = tempArray[k];
+            ++finalValues;
           }
-        }
+        break;
+        default:
+          if (n<0)
+          {
+            printf("n<0!!!\n");
+            return -1;
+          }
+          else
+          {
+            if (n<minCount)
+            {
+              minCount=n;
+              bestRow=r;
+              bestColumn=c;
+              for (k=0;k<n;++k)
+              {
+                candidates[k] = tempArray[k];
+              }
+            }
+          }
+        break;
       }
-      else
-      {
-		if (setValue(p,tempArray[0],r,c)==0)
-		  ++finalValues;
-	  }
     }
   }
+  
   if (finalValues==49)
   {
-	if (checkClueArray(p,clues))
+    if (checkClueArray(p,clues))
     {
       return -1;
     }
@@ -885,18 +926,27 @@ static int recursiveSolve(struct Square* p, int* clues)
   }
   else
   {
-    for (k=0;k<minCount;++k)
-    {
-      copy(&newSquare,p);
-      if (setValue(&newSquare,candidates[k],bestRow,bestColumn) == 0)
+    if (minCount<7)
+	{
+	  for (k=0;k<minCount;++k)
       {
-        if (recursiveSolve(&newSquare,clues) == 0)
+        copy(&newSquare,p);
+        if ((candidates[k]<1)||(candidates[k]>7))
         {
-          copy(p,&newSquare);
-          return 0;
+          printf("Out of range %d,%i,%i, minCount==%i\n,",candidates[k],bestRow,bestColumn,minCount);
+          printSquare(p,NULL);
+        }
+          
+        if (setValue(&newSquare,candidates[k],bestRow,bestColumn) == 0)
+        {
+          if (recursiveSolve(&newSquare,clues) == 0)
+          {
+            copy(p,&newSquare);
+            return 0;
+          }
         }
       }
-    }
+	}
     return -1;
   }
 }
@@ -909,13 +959,13 @@ static int getFinalValue(unsigned int value)
   switch (value)
   {
     case 1: return 1;
-	case 2: return 2;
-	case 4: return 3;
-	case 8: return 4;
-	case 16: return 5;
-	case 32: return 6;
-	case 64: return 7;
-	default: return 0;
+    case 2: return 2;
+    case 4: return 3;
+    case 8: return 4;
+    case 16: return 5;
+    case 32: return 6;
+    case 64: return 7;
+    default: return 0;
   }
 }
 
@@ -926,20 +976,20 @@ static int** packResult(struct Square* p)
   if (p)
   {
     result = (int**)malloc(7*sizeof(int*));
-	if (result)
-	{
-	  for (i=0;i<7;++i)
-	  {
-	    result[i] = (int*)malloc(7*sizeof(int));
-		if (result[i])
-		{
-		  for (j=0;j<7;++j)
-		  {
-		    result[i][j] = getFinalValue(getCell(p,i,j));
-		  }
-		}
-	  }
-	}
+    if (result)
+    {
+      for (i=0;i<7;++i)
+      {
+        result[i] = (int*)malloc(7*sizeof(int));
+        if (result[i])
+        {
+          for (j=0;j<7;++j)
+          {
+            result[i][j] = getFinalValue(getCell(p,i,j));
+          }
+        }
+      }
+    }
   }
   return result;
 }
@@ -954,7 +1004,7 @@ int** SolvePuzzle(int* clues)
     if (recursiveSolve(&square,clues)==0)
     {
       printSquare(&square,clues);
-	  return packResult(&square);
+      return packResult(&square);
     }
     else
     {
@@ -995,42 +1045,42 @@ int main(int argc, char* argv[])
 #if 0
 
     initialize(&s);
-	printSquare(&s,NULL);
-	/*
+    printSquare(&s,NULL);
+    /*
     setValue(&s,1,0,0);
-	setValue(&s,5,0,1);
-	setValue(&s,6,0,2);
-	setValue(&s,7,0,3);
-	setValue(&s,4,0,4);
-	setValue(&s,3,0,5);
-	setValue(&s,2,0,6);
+    setValue(&s,5,0,1);
+    setValue(&s,6,0,2);
+    setValue(&s,7,0,3);
+    setValue(&s,4,0,4);
+    setValue(&s,3,0,5);
+    setValue(&s,2,0,6);
 
     setValue(&s,2,1,0);
-	setValue(&s,7,1,1);
-	setValue(&s,4,1,2);
-	setValue(&s,5,1,3);
-	setValue(&s,3,1,4);
-	setValue(&s,1,1,5);
-	setValue(&s,6,1,6);
+    setValue(&s,7,1,1);
+    setValue(&s,4,1,2);
+    setValue(&s,5,1,3);
+    setValue(&s,3,1,4);
+    setValue(&s,1,1,5);
+    setValue(&s,6,1,6);
 
     setValue(&s,3,2,0);
-	setValue(&s,4,2,1);
-	setValue(&s,5,2,2);
-	setValue(&s,6,2,3);
-	setValue(&s,7,2,4);
-	setValue(&s,2,2,5);
-	setValue(&s,1,2,6);
-	
+    setValue(&s,4,2,1);
+    setValue(&s,5,2,2);
+    setValue(&s,6,2,3);
+    setValue(&s,7,2,4);
+    setValue(&s,2,2,5);
+    setValue(&s,1,2,6);
+    
     setValue(&s,4,3,0);
-	setValue(&s,6,3,1);
-	setValue(&s,3,3,2);
-	setValue(&s,1,3,3);
-	setValue(&s,2,3,4);
-	setValue(&s,7,3,5);
-	setValue(&s,5,3,6);
-	*/
-	setValue(&s,1,6,3);
-	
+    setValue(&s,6,3,1);
+    setValue(&s,3,3,2);
+    setValue(&s,1,3,3);
+    setValue(&s,2,3,4);
+    setValue(&s,7,3,5);
+    setValue(&s,5,3,6);
+    */
+    setValue(&s,1,6,3);
+    
     printSquare(&s,NULL);
 #else
     
